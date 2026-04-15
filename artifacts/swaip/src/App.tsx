@@ -31513,6 +31513,89 @@ function GuestProfileScreen({ hash, mode, onJoin, onLogin, onOpenChat, onCall, m
 }
 
 /* ─────────────────────────────────────────────────
+   PWA INSTALL NUDGE — дружеское предложение
+   через 15 мин после входа (если не установлено)
+───────────────────────────────────────────────── */
+function PWANudgeSheet({ onInstall, onDismiss, isIOS }: {
+  onInstall: () => void;
+  onDismiss: () => void;
+  isIOS: boolean;
+}) {
+  return (
+    <motion.div
+      initial={{ y: 140, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: 140, opacity: 0 }}
+      transition={{ type: 'spring', damping: 24, stiffness: 300 }}
+      style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 10000,
+        padding: '16px 20px 36px',
+        background: 'linear-gradient(175deg,#0e1235 0%,#08091e 100%)',
+        borderTop: '1px solid rgba(245,197,24,0.2)',
+        borderRadius: '22px 22px 0 0',
+        boxShadow: '0 -10px 50px rgba(0,0,0,0.65)',
+      }}
+    >
+      <div style={{ width: 36, height: 4, borderRadius: 2,
+        background: 'rgba(255,255,255,0.13)', margin: '0 auto 18px' }} />
+
+      <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+        <div style={{
+          width: 52, height: 52, borderRadius: 14, flexShrink: 0,
+          background: '#020514', border: '1.5px solid rgba(245,197,24,0.45)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 30, fontWeight: 700, fontFamily: 'Georgia,serif',
+          color: '#F5C518', boxShadow: '0 0 18px rgba(245,197,24,0.2)',
+        }}>S</div>
+
+        <div style={{ flex: 1 }}>
+          <p style={{ margin: 0, fontFamily: '"Montserrat",sans-serif', fontWeight: 700,
+            fontSize: 15, color: '#fff', lineHeight: 1.3 }}>
+            Привет, это снова я 👋
+          </p>
+          {isIOS ? (
+            <p style={{ margin: '6px 0 0', fontFamily: '"Montserrat",sans-serif', fontSize: 13,
+              color: 'rgba(255,255,255,0.52)', lineHeight: 1.5 }}>
+              Нажми <strong style={{ color: 'rgba(255,255,255,0.8)' }}>Поделиться</strong> →{' '}
+              <strong style={{ color: 'rgba(255,255,255,0.8)' }}>На экран «Домой»</strong> —
+              и мастер-ключ вводить больше не придётся 🔑
+            </p>
+          ) : (
+            <p style={{ margin: '6px 0 0', fontFamily: '"Montserrat",sans-serif', fontSize: 13,
+              color: 'rgba(255,255,255,0.52)', lineHeight: 1.5 }}>
+              Может, добавим меня на главный экран? Тебе легче —
+              не надо будет каждый раз вводить мастер-ключ 🔑
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+        {!isIOS && (
+          <button onClick={onInstall} style={{
+            flex: 1, padding: '13px 0', borderRadius: 13, border: 'none', cursor: 'pointer',
+            background: 'linear-gradient(135deg,#FFD93D 0%,#F5C518 50%,#C8860A 100%)',
+            color: '#0d0700', fontFamily: '"Montserrat",sans-serif',
+            fontWeight: 700, fontSize: 14, letterSpacing: '0.02em',
+          }}>
+            Добавить ✓
+          </button>
+        )}
+        <button onClick={onDismiss} style={{
+          flex: isIOS ? 1 : '0 0 auto', padding: '13px 20px',
+          borderRadius: 13, border: '1px solid rgba(255,255,255,0.1)',
+          cursor: 'pointer', background: 'rgba(255,255,255,0.04)',
+          color: 'rgba(255,255,255,0.4)', fontFamily: '"Montserrat",sans-serif',
+          fontWeight: 600, fontSize: 14,
+        }}>
+          Позже
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+
+/* ─────────────────────────────────────────────────
    ROOT
 ───────────────────────────────────────────────── */
 export default function App() {
@@ -31528,6 +31611,21 @@ export default function App() {
       setAppLang(code);
       try { localStorage.setItem('swaip_lang', code); } catch {}
     },
+  };
+
+  /* ── PWA install nudge ── */
+  const { isIOS: nudgeIsIOS, isInstalled: nudgeInstalled, install: nudgeInstall } = usePWAInstall();
+  const [showPWANudge, setShowPWANudge] = useState(false);
+  useEffect(() => {
+    if (screen !== 'compass') return;
+    try { if (localStorage.getItem('swaip_pwa_nudge')) return; } catch {}
+    if (nudgeInstalled) return;
+    const t = setTimeout(() => setShowPWANudge(true), 15 * 60 * 1000);
+    return () => clearTimeout(t);
+  }, [screen, nudgeInstalled]);
+  const dismissPWANudge = () => {
+    setShowPWANudge(false);
+    try { localStorage.setItem('swaip_pwa_nudge', '1'); } catch {}
   };
 
   /* Читаем сохранённый хэш из localStorage (если уже залогинен) */
@@ -31673,6 +31771,16 @@ export default function App() {
               onPendingChatOpened={() => setPendingChat(null)}
             />
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showPWANudge && (
+          <PWANudgeSheet
+            isIOS={nudgeIsIOS}
+            onInstall={async () => { try { await nudgeInstall(); } catch {} dismissPWANudge(); }}
+            onDismiss={dismissPWANudge}
+          />
         )}
       </AnimatePresence>
     </LangCtx.Provider>
