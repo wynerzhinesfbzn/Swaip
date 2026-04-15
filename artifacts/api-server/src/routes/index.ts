@@ -1,8 +1,38 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import accountsRouter from "./accounts";
+import broadcastsRouter from "./broadcasts";
+import messagingRouter from "./messaging";
+import sessionsRouter from "./sessions";
+import interactionsRouter from "./interactions";
+import moderationRouter from "./moderation";
+import audioUploadRouter from "./audioUpload";
+import imageUploadRouter from "./imageUpload";
+import greetingUploadRouter from "./greetingUpload";
+import videoUploadRouter from "./videoUpload";
+import documentUploadRouter from "./documentUpload";
+import chunkUploadRouter from "./chunkUpload";
+import storageRouter from "./storage";
+import reviewsRouter from "./reviews";
+import meetingsRouter from "./meetings";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(sessionsRouter);
+router.use(accountsRouter);
+router.use(reviewsRouter);
+router.use(meetingsRouter);
+router.use(broadcastsRouter);
+router.use(messagingRouter);
+router.use(interactionsRouter);
+router.use(moderationRouter);
+router.use(audioUploadRouter);
+router.use(imageUploadRouter);
+router.use(greetingUploadRouter);
+router.use(videoUploadRouter);
+router.use(documentUploadRouter);
+router.use(chunkUploadRouter);
+router.use(storageRouter);
 
 export default router;

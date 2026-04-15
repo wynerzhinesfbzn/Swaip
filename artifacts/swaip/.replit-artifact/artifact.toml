@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "SWAIP"
+version = "1.0.0"
+id = "artifacts/swaip"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18921
+
+[services.development]
+run = "pnpm --filter @workspace/swaip run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/swaip", "run", "build" ]
+publicDir = "artifacts/swaip/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18921"
+BASE_PATH = "/"
