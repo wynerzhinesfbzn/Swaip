@@ -31614,18 +31614,25 @@ export default function App() {
   };
 
   /* ── PWA install nudge ── */
+  /* seen=null → 1й показ через 15 мин; seen='seen1' → 2й показ через 20 мин; seen='done' → больше не показывать */
   const { isIOS: nudgeIsIOS, isInstalled: nudgeInstalled, install: nudgeInstall } = usePWAInstall();
   const [showPWANudge, setShowPWANudge] = useState(false);
   useEffect(() => {
     if (screen !== 'compass') return;
-    try { if (localStorage.getItem('swaip_pwa_nudge')) return; } catch {}
     if (nudgeInstalled) return;
-    const t = setTimeout(() => setShowPWANudge(true), 15 * 60 * 1000);
+    let seen = '';
+    try { seen = localStorage.getItem('swaip_pwa_nudge') || ''; } catch {}
+    if (seen === 'done') return;
+    const delay = seen === 'seen1' ? 20 * 60 * 1000 : 15 * 60 * 1000;
+    const t = setTimeout(() => setShowPWANudge(true), delay);
     return () => clearTimeout(t);
   }, [screen, nudgeInstalled]);
   const dismissPWANudge = () => {
     setShowPWANudge(false);
-    try { localStorage.setItem('swaip_pwa_nudge', '1'); } catch {}
+    try {
+      const seen = localStorage.getItem('swaip_pwa_nudge') || '';
+      localStorage.setItem('swaip_pwa_nudge', seen === 'seen1' ? 'done' : 'seen1');
+    } catch {}
   };
 
   /* Читаем сохранённый хэш из localStorage (если уже залогинен) */
