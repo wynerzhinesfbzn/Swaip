@@ -43,3 +43,5 @@ externalPort = 3001
 
 [userenv.shared]
 NODE_ENV = "production"
+LIVEKIT_URL = "wss://swaip1987-2ns25r0o.livekit.cloud"
+LIVEKIT_API_KEY = "APIcweMpxGZRJp7"
