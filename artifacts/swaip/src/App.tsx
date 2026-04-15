@@ -31513,14 +31513,45 @@ function GuestProfileScreen({ hash, mode, onJoin, onLogin, onOpenChat, onCall, m
 }
 
 /* ─────────────────────────────────────────────────
-   PWA INSTALL NUDGE — дружеское предложение
-   через 15 мин после входа (если не установлено)
+   PWA INSTALL NUDGE — 4 ненавязчивых напоминания
+   Шаг 0: 15 мин | 1: +20 мин | 2: след. день | 3: ещё через день
 ───────────────────────────────────────────────── */
-function PWANudgeSheet({ onInstall, onDismiss, isIOS }: {
+const PWA_NUDGE_STEPS = [
+  {
+    title: 'Привет, это снова я 👋',
+    body: 'Добавь меня на главный экран — не нужно будет вводить мастер-ключ каждый раз. И ещё один плюс: я займу весь экран, без адресной строки снизу — как настоящее приложение 📱',
+    bodyIOS: 'Нажми Поделиться → На экран «Домой» — и мастер-ключ вводить не придётся. Плюс я займу весь экран, без строки с адресом снизу 📱',
+    dismiss: 'Позже',
+  },
+  {
+    title: 'Это снова я 😊',
+    body: 'Ещё раз напомню: с главного экрана — вход в один тап, без мастер-ключа. Ну и строка с адресом пропадёт — экран будет полностью твой',
+    bodyIOS: 'Ещё раз: Поделиться → На экран «Домой». Весь экран твой, без строки снизу, без ключа при входе',
+    dismiss: 'Не сейчас',
+  },
+  {
+    title: 'Привет, вчера не успели 👋',
+    body: 'Может, всё-таки добавим? Мастер-ключ вводить не придётся, и экран станет полноэкранным — никакой адресной строки, только SWAIP 📱',
+    bodyIOS: 'Поделиться → На экран «Домой» — и мастер-ключ вводить не нужно. Экран полностью твой, без адресной строки',
+    dismiss: 'Не сейчас',
+  },
+  {
+    title: 'Последний раз, обещаю 🙏',
+    body: 'Ну как, добавим меня на экран? Один тап — без мастер-ключа, без адресной строки, весь экран твой. Потом больше не спрашиваю',
+    bodyIOS: 'Поделиться → На экран «Домой». Один раз — и всё: без ключа, без строки снизу, полный экран. Больше не напомню',
+    dismiss: 'Нет, спасибо',
+  },
+];
+
+function PWANudgeSheet({ onInstall, onDismiss, isIOS, step }: {
   onInstall: () => void;
   onDismiss: () => void;
   isIOS: boolean;
+  step: number;
 }) {
+  const s = PWA_NUDGE_STEPS[Math.min(step, PWA_NUDGE_STEPS.length - 1)];
+  const bodyText = isIOS ? s.bodyIOS : s.body;
+
   return (
     <motion.div
       initial={{ y: 140, opacity: 0 }}
@@ -31551,22 +31582,19 @@ function PWANudgeSheet({ onInstall, onDismiss, isIOS }: {
         <div style={{ flex: 1 }}>
           <p style={{ margin: 0, fontFamily: '"Montserrat",sans-serif', fontWeight: 700,
             fontSize: 15, color: '#fff', lineHeight: 1.3 }}>
-            Привет, это снова я 👋
+            {s.title}
           </p>
-          {isIOS ? (
-            <p style={{ margin: '6px 0 0', fontFamily: '"Montserrat",sans-serif', fontSize: 13,
-              color: 'rgba(255,255,255,0.52)', lineHeight: 1.5 }}>
-              Нажми <strong style={{ color: 'rgba(255,255,255,0.8)' }}>Поделиться</strong> →{' '}
-              <strong style={{ color: 'rgba(255,255,255,0.8)' }}>На экран «Домой»</strong> —
-              и мастер-ключ вводить больше не придётся 🔑
-            </p>
-          ) : (
-            <p style={{ margin: '6px 0 0', fontFamily: '"Montserrat",sans-serif', fontSize: 13,
-              color: 'rgba(255,255,255,0.52)', lineHeight: 1.5 }}>
-              Может, добавим меня на главный экран? Тебе легче —
-              не надо будет каждый раз вводить мастер-ключ 🔑
-            </p>
-          )}
+          <p style={{ margin: '6px 0 0', fontFamily: '"Montserrat",sans-serif', fontSize: 13,
+            color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>
+            {isIOS
+              ? bodyText.split(/\b(Поделиться|На экран «Домой»)\b/).map((part, i) =>
+                  ['Поделиться', 'На экран «Домой»'].includes(part)
+                    ? <strong key={i} style={{ color: 'rgba(255,255,255,0.85)' }}>{part}</strong>
+                    : part
+                )
+              : bodyText
+            }
+          </p>
         </div>
       </div>
 
@@ -31588,7 +31616,7 @@ function PWANudgeSheet({ onInstall, onDismiss, isIOS }: {
           color: 'rgba(255,255,255,0.4)', fontFamily: '"Montserrat",sans-serif',
           fontWeight: 600, fontSize: 14,
         }}>
-          Позже
+          {s.dismiss}
         </button>
       </div>
     </motion.div>
@@ -31613,25 +31641,46 @@ export default function App() {
     },
   };
 
-  /* ── PWA install nudge ── */
-  /* seen=null → 1й показ через 15 мин; seen='seen1' → 2й показ через 20 мин; seen='done' → больше не показывать */
+  /* ── PWA install nudge ──
+     Формат localStorage: '' | 'n:{step}:{dismissedAt}' | 'done'
+     Шаг 0: через 15 мин после входа
+     Шаг 1: через 20 мин после отказа от шага 0
+     Шаг 2: через 24 ч после отказа от шага 1
+     Шаг 3: через 48 ч после отказа от шага 2
+     После шага 3 → 'done', больше не показываем */
   const { isIOS: nudgeIsIOS, isInstalled: nudgeInstalled, install: nudgeInstall } = usePWAInstall();
   const [showPWANudge, setShowPWANudge] = useState(false);
+  const [nudgeStep, setNudgeStep] = useState(0);
   useEffect(() => {
     if (screen !== 'compass') return;
     if (nudgeInstalled) return;
-    let seen = '';
-    try { seen = localStorage.getItem('swaip_pwa_nudge') || ''; } catch {}
-    if (seen === 'done') return;
-    const delay = seen === 'seen1' ? 20 * 60 * 1000 : 15 * 60 * 1000;
-    const t = setTimeout(() => setShowPWANudge(true), delay);
+    let raw = '';
+    try { raw = localStorage.getItem('swaip_pwa_nudge') || ''; } catch {}
+    if (raw === 'done') return;
+    let step = 0;
+    let dismissedAt = 0;
+    if (raw.startsWith('n:')) {
+      const parts = raw.split(':');
+      step = parseInt(parts[1], 10) || 0;
+      dismissedAt = parseInt(parts[2], 10) || 0;
+    }
+    const delays = [15 * 60 * 1000, 20 * 60 * 1000, 24 * 60 * 60 * 1000, 48 * 60 * 60 * 1000];
+    const elapsed = dismissedAt ? Date.now() - dismissedAt : 0;
+    const remaining = Math.max(0, delays[step] - elapsed);
+    setNudgeStep(step);
+    const t = setTimeout(() => setShowPWANudge(true), remaining);
     return () => clearTimeout(t);
   }, [screen, nudgeInstalled]);
   const dismissPWANudge = () => {
     setShowPWANudge(false);
     try {
-      const seen = localStorage.getItem('swaip_pwa_nudge') || '';
-      localStorage.setItem('swaip_pwa_nudge', seen === 'seen1' ? 'done' : 'seen1');
+      const nextStep = nudgeStep + 1;
+      if (nextStep >= 4) {
+        localStorage.setItem('swaip_pwa_nudge', 'done');
+      } else {
+        localStorage.setItem('swaip_pwa_nudge', `n:${nextStep}:${Date.now()}`);
+        setNudgeStep(nextStep);
+      }
     } catch {}
   };
 
@@ -31785,6 +31834,7 @@ export default function App() {
         {showPWANudge && (
           <PWANudgeSheet
             isIOS={nudgeIsIOS}
+            step={nudgeStep}
             onInstall={async () => { try { await nudgeInstall(); } catch {} dismissPWANudge(); }}
             onDismiss={dismissPWANudge}
           />
