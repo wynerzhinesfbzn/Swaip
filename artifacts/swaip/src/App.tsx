@@ -24155,175 +24155,144 @@ function MeetingsScreen({ onBack, userHash }: { onBack: () => void; userHash: st
 
               return (
                 <motion.div key={m.meetingId} layout
-                  initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}
-                  transition={{ delay: idx * 0.04 }}
-                  style={{ display:'flex', borderRadius:16, overflow:'hidden',
-                    border:`2px solid ${pal.frame}`,
-                    boxShadow:`0 6px 24px rgba(0,0,0,0.5)` }}>
+                    initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}
+                    transition={{ delay: idx * 0.04 }}
+                    style={{ borderRadius:18, overflow:'hidden',
+                      border:`2px solid ${pal.frame}`,
+                      background:pal.door,
+                      boxShadow:`0 8px 32px rgba(0,0,0,0.55)` }}>
 
-                  {/* ═══ ДВЕРНОЕ ПОЛОТНО ═══ */}
-                  <div style={{ flex:1, background:pal.door, position:'relative',
-                    display:'flex', flexDirection:'column', padding:'10px 10px 8px', gap:8 }}>
+                    {/* ═══ ТАБЛИЧКА НА ДВЕРИ ═══ */}
+                    <div style={{ padding:'18px 18px 14px', position:'relative' }}>
+                      <div style={{ position:'absolute', top:0, left:0, right:0, height:2,
+                        background:`linear-gradient(90deg,transparent,${pal.accent}50,transparent)` }} />
 
-                    {/* Декоративная рамка */}
-                    <div style={{ position:'absolute', inset:5, border:`1px solid rgba(255,255,255,0.04)`,
-                      borderRadius:10, pointerEvents:'none' }} />
-
-                    {/* ══ ТАБЛИЧКА (как на офисной двери) ══ */}
-                    <div style={{ position:'relative',
-                      background:'rgba(0,0,0,0.5)',
-                      border:`1.5px solid ${pal.frame}`,
-                      borderRadius:8, padding:'8px 10px',
-                      boxShadow:`inset 0 1px 0 rgba(255,255,255,0.08), 0 2px 6px rgba(0,0,0,0.5)` }}>
-                      {/* Металлический блик сверху */}
-                      <div style={{ position:'absolute', top:0, left:12, right:12, height:1,
-                        background:`linear-gradient(90deg,transparent,${pal.accent}55,transparent)`, borderRadius:1 }} />
-                      {/* Верхняя строка: КАБ. + дата */}
-                      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:5 }}>
-                        <div style={{ display:'inline-flex', alignItems:'center', gap:4 }}>
-                          <span style={{ fontSize:8, color:'rgba(255,255,255,0.3)', fontWeight:700,
-                            letterSpacing:'0.15em', textTransform:'uppercase' }}>КАБ.</span>
-                          <span style={{ fontSize:13, fontWeight:900, color:pal.accent,
-                            letterSpacing:'0.1em', fontFamily:'monospace' }}>
+                      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+                        <div style={{ display:'inline-flex', alignItems:'center', gap:6,
+                          background:'rgba(0,0,0,0.45)', border:`1.5px solid ${pal.frame}`,
+                          borderRadius:8, padding:'5px 12px' }}>
+                          <span style={{ fontSize:9, color:'rgba(255,255,255,0.4)', fontWeight:700,
+                            letterSpacing:'0.2em', textTransform:'uppercase' }}>КАБ.</span>
+                          <span style={{ fontSize:15, fontWeight:900, color:pal.accent,
+                            letterSpacing:'0.12em', fontFamily:'monospace' }}>
                             {m.meetingId.toUpperCase()}
                           </span>
                         </div>
                         {m.startTime && (
-                          <span style={{ fontSize:9, color: doorClosed ? '#fca5a5' : 'rgba(255,255,255,0.35)',
-                            fontWeight: doorClosed ? 700 : 400 }}>
-                            {doorClosed ? '🔒 ' : '📅 '}{fmtDate(m.startTime)}
+                          <span style={{ fontSize:11, color: doorClosed ? '#fca5a5' : 'rgba(255,255,255,0.4)',
+                            fontWeight: doorClosed ? 700 : 400, display:'flex', alignItems:'center', gap:4 }}>
+                            {doorClosed ? '🔒' : '📅'} {fmtDate(m.startTime)}
                           </span>
                         )}
                       </div>
-                      {/* Название — главная надпись таблички */}
-                      <div style={{ fontSize:14, fontWeight:900, color:'#fff', lineHeight:1.25,
-                        letterSpacing:'0.01em', wordBreak:'break-word' }}>
+
+                      <div style={{ fontSize:19, fontWeight:900, color:'#fff', lineHeight:1.2,
+                        letterSpacing:'0.01em', wordBreak:'break-word', marginBottom:6 }}>
                         {m.name}
                       </div>
-                      {/* Организатор */}
+
                       {creatorName && (
-                        <div style={{ fontSize:9, color:'rgba(255,255,255,0.3)', marginTop:3 }}>
-                          {creatorName}
+                        <div style={{ fontSize:12, color:'rgba(255,255,255,0.38)',
+                          display:'flex', alignItems:'center', gap:5 }}>
+                          👤 {creatorName}
                         </div>
                       )}
                     </div>
 
-                    {/* ══ КНОПКА ВХОД ══ */}
-                    <AnimatePresence mode="wait">
-                      {isLocked ? (
-                        <motion.div key="locked"
-                          initial={{ opacity:0, scale:0.95 }} animate={{ opacity:1, scale:1 }} exit={{ opacity:0, scale:0.95 }}
-                          style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.25)',
-                            borderRadius:9, padding:'7px 10px', display:'flex', alignItems:'center', gap:8 }}>
-                          <motion.span animate={{ opacity:[1,0.2,1,0.2,1] }}
-                            transition={{ duration:0.6, repeat:3 }}
-                            style={{ fontSize:18 }}>❌</motion.span>
-                          <div>
-                            <div style={{ fontSize:10, color:'#fca5a5', fontWeight:800 }}>Вход закрыт</div>
-                            <div style={{ fontSize:9, color:'rgba(252,165,165,0.6)' }}>
-                              Откроется: {fmtDate(m.startTime)}
+                    <div style={{ height:1, background:`linear-gradient(90deg,transparent,${pal.frame},transparent)`, margin:'0 18px' }} />
+
+                    {/* ══ КНОПКА ВОЙТИ ══ */}
+                    <div style={{ padding:'14px 18px' }}>
+                      <AnimatePresence mode="wait">
+                        {isLocked ? (
+                          <motion.div key="locked"
+                            initial={{ opacity:0, scale:0.95 }} animate={{ opacity:1, scale:1 }} exit={{ opacity:0, scale:0.95 }}
+                            style={{ background:'rgba(239,68,68,0.1)', border:'1.5px solid rgba(239,68,68,0.35)',
+                              borderRadius:13, padding:'13px 16px', display:'flex', alignItems:'center', gap:12 }}>
+                            <motion.span animate={{ opacity:[1,0.2,1,0.2,1] }}
+                              transition={{ duration:0.6, repeat:3 }}
+                              style={{ fontSize:22 }}>❌</motion.span>
+                            <div>
+                              <div style={{ fontSize:13, color:'#fca5a5', fontWeight:800 }}>Вход закрыт</div>
+                              <div style={{ fontSize:11, color:'rgba(252,165,165,0.6)', marginTop:2 }}>
+                                Откроется: {fmtDate(m.startTime)}
+                              </div>
                             </div>
-                          </div>
-                        </motion.div>
-                      ) : (
-                        <motion.button key="enter" whileTap={{ scale:0.96 }} onClick={() => handleEnter(m)}
-                          style={{ width:'100%', padding:'9px 0', cursor:'pointer', borderRadius:9,
-                            background: doorClosed
-                              ? 'rgba(107,114,128,0.15)'
-                              : `linear-gradient(135deg,${ACCENT},#818cf8)`,
-                            border:`1.5px solid ${doorClosed ? 'rgba(107,114,128,0.3)' : 'rgba(129,140,248,0.5)'}`,
-                            display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-                            fontFamily:'"Montserrat",sans-serif', color:'#fff', fontWeight:900, fontSize:13,
-                            letterSpacing:'0.08em',
-                            boxShadow: doorClosed ? 'none' : `0 3px 14px rgba(99,102,241,0.35)`,
-                            transition:'all 0.2s' }}>
-                          <span style={{ fontSize:16 }}>{doorClosed ? '🔒' : '🚪'}</span>
-                          ВХОД
+                          </motion.div>
+                        ) : (
+                          <motion.button key="enter" whileTap={{ scale:0.97 }} onClick={() => handleEnter(m)}
+                            style={{ width:'100%', boxSizing:'border-box', padding:'14px 0', cursor:'pointer', borderRadius:13,
+                              background: doorClosed
+                                ? 'rgba(107,114,128,0.15)'
+                                : `linear-gradient(135deg,${ACCENT} 0%,#818cf8 100%)`,
+                              border:`2px solid ${doorClosed ? 'rgba(107,114,128,0.3)' : pal.accent}`,
+                              display:'flex', alignItems:'center', justifyContent:'center', gap:10,
+                              fontFamily:'"Montserrat",sans-serif', color:'#fff', fontWeight:900, fontSize:16,
+                              letterSpacing:'0.12em',
+                              boxShadow: doorClosed ? 'none' : `0 5px 20px ${ACCENT}55`,
+                              transition:'all 0.2s' }}>
+                            <span style={{ fontSize:20 }}>{doorClosed ? '🔒' : '🚪'}</span>
+                            ВОЙТИ
+                          </motion.button>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    {/* ══ НИЖНЯЯ ПАНЕЛЬ: токены + действия ══ */}
+                    <div style={{ borderTop:`1px solid ${pal.frame}50`, padding:'10px 18px 14px',
+                      display:'flex', alignItems:'center', gap:8 }}>
+                      <div style={{ flex:1, display:'flex', gap:5, flexWrap:'wrap', overflow:'hidden', minWidth:0 }}>
+                        {m.commonToken && (
+                          <span style={{ fontSize:10, color:pal.accent, background:'rgba(0,0,0,0.35)',
+                            borderRadius:6, padding:'3px 8px', border:`1px solid ${pal.frame}`,
+                            fontWeight:800, letterSpacing:'0.06em', fontFamily:'monospace' }}>
+                            🔑 {m.commonToken}
+                          </span>
+                        )}
+                        {m.allowAnonymous && (
+                          <span style={{ fontSize:10, color:'rgba(156,163,175,0.7)',
+                            borderRadius:6, padding:'3px 8px', border:'1px solid rgba(255,255,255,0.08)',
+                            background:'rgba(255,255,255,0.04)' }}>
+                            👻 Аноним
+                          </span>
+                        )}
+                        {m.anonymousToken && (
+                          <span style={{ fontSize:10, color:'rgba(165,180,252,0.8)',
+                            borderRadius:6, padding:'3px 8px', border:'1px solid rgba(99,102,241,0.3)',
+                            background:'rgba(99,102,241,0.08)', fontWeight:700, fontFamily:'monospace' }}>
+                            🎭 {m.anonymousToken}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+                        <motion.button whileTap={{ scale:0.85 }} onClick={() => copyLink(link, m.meetingId)}
+                          title="Скопировать ссылку"
+                          style={{ width:36, height:36, borderRadius:10, cursor:'pointer',
+                            display:'flex', alignItems:'center', justifyContent:'center',
+                            background: isCopied ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.07)',
+                            border:`1.5px solid ${isCopied ? 'rgba(74,222,128,0.5)' : pal.frame}`,
+                            color: isCopied ? '#4ade80' : 'rgba(255,255,255,0.45)', fontSize:15, transition:'all 0.2s' }}>
+                          {isCopied ? '✓' : '📋'}
                         </motion.button>
-                      )}
-                    </AnimatePresence>
-
-                    {/* ══ НИЖНЯЯ СТРОКА: бейджи + ссылка ══ */}
-                    <div style={{ display:'flex', alignItems:'center', gap:4, overflow:'hidden', minWidth:0 }}>
-                      {m.commonToken && (
-                        <span style={{ fontSize:8, color:pal.accent, background:'rgba(0,0,0,0.35)',
-                          borderRadius:4, padding:'1px 5px', border:`1px solid ${pal.frame}`,
-                          fontWeight:800, letterSpacing:'0.06em', fontFamily:'monospace', flexShrink:0 }}>
-                          🔑{m.commonToken}
-                        </span>
-                      )}
-                      {m.tokenType === 'individual' && (
-                        <span style={{ fontSize:8, color:'rgba(251,191,36,0.8)',
-                          borderRadius:4, padding:'1px 5px', border:'1px solid rgba(245,158,11,0.2)',
-                          background:'rgba(245,158,11,0.08)', fontWeight:700, flexShrink:0 }}>
-                          👤
-                        </span>
-                      )}
-                      {m.allowAnonymous && (
-                        <span style={{ fontSize:8, color:'rgba(156,163,175,0.6)',
-                          borderRadius:4, padding:'1px 5px', border:'1px solid rgba(255,255,255,0.07)',
-                          background:'rgba(255,255,255,0.04)', flexShrink:0 }}>
-                          👻
-                        </span>
-                      )}
-                      {m.anonymousToken && (
-                        <span style={{ fontSize:8, color:'rgba(165,180,252,0.7)',
-                          borderRadius:4, padding:'1px 5px', border:'1px solid rgba(99,102,241,0.3)',
-                          background:'rgba(99,102,241,0.08)', flexShrink:0, fontWeight:700 }}>
-                          🎭{m.anonymousToken}
-                        </span>
-                      )}
-                      <span style={{ fontSize:8, color:'rgba(255,255,255,0.13)', fontFamily:'monospace',
-                        overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1, minWidth:0 }}>
-                        {link}
-                      </span>
+                        <motion.button whileTap={{ scale:0.85 }} onClick={() => shareLink(link, m.name)}
+                          title="Поделиться"
+                          style={{ width:36, height:36, borderRadius:10, cursor:'pointer',
+                            display:'flex', alignItems:'center', justifyContent:'center',
+                            background:'rgba(255,255,255,0.07)', border:`1.5px solid ${pal.frame}`,
+                            color:'rgba(255,255,255,0.45)', fontSize:15 }}>
+                          ↗
+                        </motion.button>
+                        <motion.button whileTap={{ scale:0.85 }} onClick={() => handleDelete(m.meetingId)}
+                          title="Удалить"
+                          style={{ width:36, height:36, borderRadius:10, cursor:'pointer',
+                            display:'flex', alignItems:'center', justifyContent:'center',
+                            background:'rgba(239,68,68,0.07)', border:'1.5px solid rgba(239,68,68,0.2)',
+                            color:'rgba(248,113,113,0.6)', fontSize:15 }}>
+                          🗑️
+                        </motion.button>
+                      </div>
                     </div>
-                  </div>
-
-                  {/* ═══ ПРАВАЯ ПАНЕЛЬ ═══ */}
-                  <div style={{ width:62, background:'rgba(0,0,0,0.4)', borderLeft:`1px solid ${pal.frame}`,
-                    display:'flex', flexDirection:'column', alignItems:'center',
-                    justifyContent:'space-evenly', padding:'8px 0' }}>
-                    {/* Копировать */}
-                    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
-                      <motion.button whileTap={{ scale:0.85 }} onClick={() => copyLink(link, m.meetingId)}
-                        style={{ width:36, height:36, borderRadius:10, cursor:'pointer',
-                          display:'flex', alignItems:'center', justifyContent:'center',
-                          background: isCopied ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.06)',
-                          border:`1.5px solid ${isCopied ? 'rgba(74,222,128,0.5)' : pal.frame}`,
-                          color: isCopied ? '#4ade80' : 'rgba(255,255,255,0.5)', fontSize:15, transition:'all 0.2s' }}>
-                        {isCopied ? '✓' : '📋'}
-                      </motion.button>
-                      <span style={{ fontSize:8, color:'rgba(255,255,255,0.28)', fontWeight:700 }}>
-                        {isCopied ? 'Скоп.' : 'Копия'}
-                      </span>
-                    </div>
-                    <div style={{ width:22, height:1, background:'rgba(255,255,255,0.06)' }} />
-                    {/* Поделиться */}
-                    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
-                      <motion.button whileTap={{ scale:0.85 }} onClick={() => shareLink(link, m.name)}
-                        style={{ width:36, height:36, borderRadius:10, cursor:'pointer',
-                          display:'flex', alignItems:'center', justifyContent:'center',
-                          background:'rgba(255,255,255,0.06)', border:`1.5px solid ${pal.frame}`,
-                          color:'rgba(255,255,255,0.5)', fontSize:15 }}>
-                        ↗
-                      </motion.button>
-                      <span style={{ fontSize:8, color:'rgba(255,255,255,0.28)', fontWeight:700 }}>Отпр.</span>
-                    </div>
-                    <div style={{ width:22, height:1, background:'rgba(255,255,255,0.06)' }} />
-                    {/* Удалить */}
-                    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
-                      <motion.button whileTap={{ scale:0.85 }} onClick={() => handleDelete(m.meetingId)}
-                        style={{ width:36, height:36, borderRadius:10, cursor:'pointer',
-                          display:'flex', alignItems:'center', justifyContent:'center',
-                          background:'rgba(239,68,68,0.07)', border:'1.5px solid rgba(239,68,68,0.2)',
-                          color:'rgba(248,113,113,0.6)', fontSize:15 }}>
-                        🗑️
-                      </motion.button>
-                      <span style={{ fontSize:8, color:'rgba(248,113,113,0.35)', fontWeight:700 }}>Удалить</span>
-                    </div>
-                  </div>
-                </motion.div>
+                  </motion.div>
               );
             })}
           </div>
