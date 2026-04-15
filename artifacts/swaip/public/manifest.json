@@ -11,13 +11,13 @@
   "lang": "ru",
   "icons": [
     {
-      "src": "/swaip-logo.png",
+      "src": "/icon-app.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/swaip-logo.png",
+      "src": "/icon-app.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
