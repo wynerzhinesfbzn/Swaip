@@ -30,3 +30,8 @@ externalPort = 80
 [[ports]]
 localPort = 18921
 externalPort = 3000
+
+[userenv]
+
+[userenv.shared]
+NODE_ENV = "production"
