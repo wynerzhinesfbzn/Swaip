@@ -888,7 +888,7 @@ function LoginScreen({ onSuccess }: { onSuccess: (hash: string) => void }) {
   };
 
   const primaryBtn: React.CSSProperties = {
-    width:'100%', padding:'13px 16px',
+    width:'100%', padding:'10px 16px',
     background:'linear-gradient(180deg,rgba(0,180,255,0.78) 0%,rgba(0,80,200,0.88) 100%)',
     border:'2px solid rgba(0,220,255,0.58)', borderRadius:14, color:'#fff',
     fontWeight:900, fontSize:14, letterSpacing:'0.07em', textTransform:'uppercase',
@@ -896,7 +896,7 @@ function LoginScreen({ onSuccess }: { onSuccess: (hash: string) => void }) {
     backdropFilter:'blur(10px)', boxShadow:'0 0 20px rgba(0,180,255,0.45), inset 0 1px 0 rgba(255,255,255,0.15)',
   };
   const dimBtn: React.CSSProperties = {
-    width:'100%', padding:'11px 16px',
+    width:'100%', padding:'9px 16px',
     background:'rgba(0,20,80,0.6)', border:'1.5px solid rgba(0,180,255,0.3)', borderRadius:12,
     color:'rgba(170,220,255,0.82)', fontWeight:700, fontSize:13, letterSpacing:'0.06em',
     textTransform:'uppercase', cursor:'pointer', fontFamily:"'Arial Black',Arial,sans-serif",
@@ -1152,19 +1152,19 @@ function LoginScreen({ onSuccess }: { onSuccess: (hash: string) => void }) {
 
       {/* ── Единая нижняя панель со всеми кнопками ── */}
       <div style={{ position:'fixed', bottom:0, left:0, right:0,
-        padding:'12px 14px calc(12px + env(safe-area-inset-bottom,0px))',
+        padding:'8px 14px calc(8px + env(safe-area-inset-bottom,0px))',
         background:'linear-gradient(0deg,rgba(2,5,20,1) 0%,rgba(2,5,20,0.96) 100%)',
         borderTop:'1px solid rgba(0,200,255,0.15)', zIndex:200,
-        display:'flex', flexDirection:'column', gap:8 }}>
+        display:'flex', flexDirection:'column', gap:6 }}>
 
         {/* ═══ ШАР ВЫБОРА ЯЗЫКА ═══ */}
-        <div style={{ display:'flex', justifyContent:'center', marginBottom: selectedLang ? 2 : 16 }}>
+        <div style={{ display:'flex', justifyContent:'center', marginBottom: selectedLang ? 0 : 12 }}>
           <motion.button whileTap={{ scale:0.92 }} onClick={() => setShowLangPicker(true)}
             animate={{ boxShadow: selectedLang
               ? ['0 0 12px rgba(0,120,255,0.3)','0 0 22px rgba(0,180,255,0.55)','0 0 12px rgba(0,120,255,0.3)']
               : ['0 0 20px rgba(0,150,255,0.5)','0 0 45px rgba(0,200,255,0.85)','0 0 20px rgba(0,150,255,0.5)'] }}
             transition={{ duration:2, repeat:Infinity }}
-            style={{ width: selectedLang ? 72 : 96, height: selectedLang ? 72 : 96,
+            style={{ width: selectedLang ? 56 : 96, height: selectedLang ? 56 : 96,
               borderRadius:'50%',
               background: selectedLang
                 ? 'linear-gradient(135deg,rgba(0,40,100,0.9),rgba(0,20,60,0.95))'
@@ -1173,12 +1173,12 @@ function LoginScreen({ onSuccess }: { onSuccess: (hash: string) => void }) {
               display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
               cursor:'pointer', gap:3, transition:'width 0.3s,height 0.3s',
               backdropFilter:'blur(12px)' }}>
-            <span style={{ fontSize: selectedLang ? 30 : 38, lineHeight:1 }}>
+            <span style={{ fontSize: selectedLang ? 24 : 38, lineHeight:1 }}>
               {selectedLang ? selectedLang.flag : '🌐'}
             </span>
-            <span style={{ fontSize: selectedLang ? 8 : 9,
+            <span style={{ fontSize: selectedLang ? 7 : 9,
               color:'rgba(160,225,255,0.85)', fontFamily:'Arial,sans-serif', fontWeight:800,
-              textTransform:'uppercase', letterSpacing:'0.05em', maxWidth: selectedLang ? 60 : 80,
+              textTransform:'uppercase', letterSpacing:'0.05em', maxWidth: selectedLang ? 50 : 80,
               overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', textAlign:'center' }}>
               {selectedLang ? selectedLang.native : 'Language'}
             </span>
@@ -1189,7 +1189,7 @@ function LoginScreen({ onSuccess }: { onSuccess: (hash: string) => void }) {
         <AnimatePresence mode="wait">
           {selectedLang ? (
             <motion.div key="full-form" initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }}
-              exit={{ opacity:0, y:4 }} style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              exit={{ opacity:0, y:4 }} style={{ display:'flex', flexDirection:'column', gap:6 }}>
 
               {/* Генерация / новый ключ */}
               {step === 1 ? (
