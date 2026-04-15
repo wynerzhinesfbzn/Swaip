@@ -82,3 +82,10 @@ httpServer.on("error", (err) => {
 httpServer.listen(port, () => {
   logger.info({ port }, "Server listening (HTTP + WebSocket /ws/calls)");
 });
+
+function shutdown() {
+  httpServer.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 3000);
+}
+process.on("SIGTERM", shutdown);
+process.on("SIGINT",  shutdown);
