@@ -31641,49 +31641,6 @@ export default function App() {
     },
   };
 
-  /* ── PWA install nudge ──
-     Формат localStorage: '' | 'n:{step}:{dismissedAt}' | 'done'
-     Шаг 0: через 15 мин после входа
-     Шаг 1: через 20 мин после отказа от шага 0
-     Шаг 2: через 24 ч после отказа от шага 1
-     Шаг 3: через 48 ч после отказа от шага 2
-     После шага 3 → 'done', больше не показываем */
-  const { isIOS: nudgeIsIOS, isInstalled: nudgeInstalled, install: nudgeInstall } = usePWAInstall();
-  const [showPWANudge, setShowPWANudge] = useState(false);
-  const [nudgeStep, setNudgeStep] = useState(0);
-  useEffect(() => {
-    if (screen !== 'compass') return;
-    if (nudgeInstalled) return;
-    let raw = '';
-    try { raw = localStorage.getItem('swaip_pwa_nudge') || ''; } catch {}
-    if (raw === 'done') return;
-    let step = 0;
-    let dismissedAt = 0;
-    if (raw.startsWith('n:')) {
-      const parts = raw.split(':');
-      step = parseInt(parts[1], 10) || 0;
-      dismissedAt = parseInt(parts[2], 10) || 0;
-    }
-    const delays = [15 * 60 * 1000, 20 * 60 * 1000, 24 * 60 * 60 * 1000, 48 * 60 * 60 * 1000];
-    const elapsed = dismissedAt ? Date.now() - dismissedAt : 0;
-    const remaining = Math.max(0, delays[step] - elapsed);
-    setNudgeStep(step);
-    const t = setTimeout(() => setShowPWANudge(true), remaining);
-    return () => clearTimeout(t);
-  }, [screen, nudgeInstalled]);
-  const dismissPWANudge = () => {
-    setShowPWANudge(false);
-    try {
-      const nextStep = nudgeStep + 1;
-      if (nextStep >= 4) {
-        localStorage.setItem('swaip_pwa_nudge', 'done');
-      } else {
-        localStorage.setItem('swaip_pwa_nudge', `n:${nextStep}:${Date.now()}`);
-        setNudgeStep(nextStep);
-      }
-    } catch {}
-  };
-
   /* Читаем сохранённый хэш из localStorage (если уже залогинен) */
   const [userHash, setUserHash] = useState(() => {
     try { const hs = JSON.parse(localStorage.getItem('swaip_hashes')||'[]'); return hs[0] || ''; } catch { return ''; }
@@ -31727,6 +31684,49 @@ export default function App() {
     })();
     return () => { cancelled = true; };
   }, []);
+
+  /* ── PWA install nudge ──
+     Формат localStorage: '' | 'n:{step}:{dismissedAt}' | 'done'
+     Шаг 0: через 15 мин после входа
+     Шаг 1: через 20 мин после отказа от шага 0
+     Шаг 2: через 24 ч после отказа от шага 1
+     Шаг 3: через 48 ч после отказа от шага 2
+     После шага 3 → 'done', больше не показываем */
+  const { isIOS: nudgeIsIOS, isInstalled: nudgeInstalled, install: nudgeInstall } = usePWAInstall();
+  const [showPWANudge, setShowPWANudge] = useState(false);
+  const [nudgeStep, setNudgeStep] = useState(0);
+  useEffect(() => {
+    if (screen !== 'compass') return;
+    if (nudgeInstalled) return;
+    let raw = '';
+    try { raw = localStorage.getItem('swaip_pwa_nudge') || ''; } catch {}
+    if (raw === 'done') return;
+    let step = 0;
+    let dismissedAt = 0;
+    if (raw.startsWith('n:')) {
+      const parts = raw.split(':');
+      step = parseInt(parts[1], 10) || 0;
+      dismissedAt = parseInt(parts[2], 10) || 0;
+    }
+    const delays = [15 * 60 * 1000, 20 * 60 * 1000, 24 * 60 * 60 * 1000, 48 * 60 * 60 * 1000];
+    const elapsed = dismissedAt ? Date.now() - dismissedAt : 0;
+    const remaining = Math.max(0, delays[step] - elapsed);
+    setNudgeStep(step);
+    const t = setTimeout(() => setShowPWANudge(true), remaining);
+    return () => clearTimeout(t);
+  }, [screen, nudgeInstalled]);
+  const dismissPWANudge = () => {
+    setShowPWANudge(false);
+    try {
+      const nextStep = nudgeStep + 1;
+      if (nextStep >= 4) {
+        localStorage.setItem('swaip_pwa_nudge', 'done');
+      } else {
+        localStorage.setItem('swaip_pwa_nudge', `n:${nextStep}:${Date.now()}`);
+        setNudgeStep(nextStep);
+      }
+    } catch {}
+  };
 
   /* Проверяем URL при загрузке — вдруг это ссылка-приглашение */
   const [guestParams, setGuestParams] = useState<{ hash: string; mode: GuestMode } | null>(() => {
