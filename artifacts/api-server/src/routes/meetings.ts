@@ -19,15 +19,35 @@ function getBucket() {
 
 async function uploadMeetingFile(buf: Buffer, filename: string, mimeType: string): Promise<string> {
   const objectName = `meeting_files/${filename}`;
-  try {
-    const bucket = getBucket();
-    const file = bucket.file(objectName);
-    await file.save(buf, { contentType: mimeType, resumable: false });
-  } catch {}
+  const bucket = getBucket();
+  const file = bucket.file(objectName);
+  await file.save(buf, { contentType: mimeType, resumable: false });
   return `/api/meeting-file/${filename}`;
 }
 
 const router: IRouter = Router();
+
+/* ──────────────────────────────────────────────────
+ * GET /api/meeting-file/:filename — отдать загруженный файл из хранилища
+ * ────────────────────────────────────────────────── */
+router.get("/meeting-file/:filename", async (req, res) => {
+  const { filename } = req.params;
+  if (!/^[\w\-.]+$/.test(filename)) { res.status(400).json({ error: "Неверное имя файла" }); return; }
+  try {
+    const bucket = getBucket();
+    const file = bucket.file(`meeting_files/${filename}`);
+    const [exists] = await file.exists();
+    if (!exists) { res.status(404).json({ error: "Файл не найден" }); return; }
+    const [metadata] = await file.getMetadata();
+    const contentType = (metadata.contentType as string) || "application/octet-stream";
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Cache-Control", "private, max-age=3600");
+    res.setHeader("Accept-Ranges", "bytes");
+    file.createReadStream().pipe(res);
+  } catch {
+    res.status(404).json({ error: "Файл не найден" });
+  }
+});
 
 async function logAction(meetingId: string, action: string, actorId: string, targetId?: string, details?: object) {
   try {

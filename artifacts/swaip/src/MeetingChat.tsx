@@ -122,21 +122,29 @@ export default function MeetingChat({ meetingId, participantToken, myParticipant
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      const mimeType =
+        MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' :
+        MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' :
+        MediaRecorder.isTypeSupported('audio/ogg;codecs=opus') ? 'audio/ogg;codecs=opus' :
+        'audio/mp4';
+      const mr = new MediaRecorder(stream, { mimeType });
       chunksRef.current = [];
       mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       mr.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        const ext = mimeType.includes('ogg') ? 'ogg' : mimeType.includes('mp4') ? 'mp4' : 'webm';
+        const blob = new Blob(chunksRef.current, { type: mimeType });
         if (blob.size < 500) return;
         const fd = new FormData();
-        fd.append('file', blob, `voice-${Date.now()}.webm`);
-        await fetch(`${API}/api/meetings/${meetingId}/messages/upload`, {
-          method: 'POST',
-          headers: { 'x-participant-token': participantToken },
-          credentials: 'include',
-          body: fd,
-        });
+        fd.append('file', blob, `voice-${Date.now()}.${ext}`);
+        try {
+          await fetch(`${API}/api/meetings/${meetingId}/messages/upload`, {
+            method: 'POST',
+            headers: { 'x-participant-token': participantToken },
+            credentials: 'include',
+            body: fd,
+          });
+        } catch {}
       };
       mr.start();
       mediaRecorderRef.current = mr;

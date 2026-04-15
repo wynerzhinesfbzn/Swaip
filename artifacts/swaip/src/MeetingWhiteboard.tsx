@@ -47,8 +47,16 @@ function getBB(o: SceneObj, ctx: CanvasRenderingContext2D | null): BB {
     case 'ell':
       return { x:o.cx-Math.abs(o.rx), y:o.cy-Math.abs(o.ry), w:Math.abs(o.rx)*2, h:Math.abs(o.ry)*2 };
     case 'text': {
-      const tw = ctx ? ctx.measureText(o.text).width : o.text.length * o.size * 0.6;
-      return { x:o.x, y:o.y-o.size, w:tw+4, h:o.size*1.4 };
+      let tw: number;
+      if (ctx) {
+        ctx.save();
+        ctx.font = `${o.size}px Montserrat, Arial, sans-serif`;
+        tw = ctx.measureText(o.text).width;
+        ctx.restore();
+      } else {
+        tw = o.text.length * o.size * 0.6;
+      }
+      return { x:o.x, y:o.y-o.size, w:tw+8, h:o.size*1.5 };
     }
   }
 }
@@ -225,7 +233,6 @@ export default function MeetingWhiteboard({meetingId,participantToken,isHost,wsR
     if (!id) return;
     const o = objs.find(x=>x.id===id); if (!o) return;
     const mCtx = getCtx();
-    if (mCtx) ctx.font=`${(o as any).size||16}px Montserrat, Arial, sans-serif`;
     const bb = getBB(o, mCtx);
     const pad=6;
     const bx=bb.x-pad, by=bb.y-pad, bw=bb.w+pad*2, bh=bb.h+pad*2;
