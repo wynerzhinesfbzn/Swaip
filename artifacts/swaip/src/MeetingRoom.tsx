@@ -358,8 +358,14 @@ function RoomInner({
 }) {
   const room = useRoomContext();
   const participants = useParticipants();
-  const { localParticipant } = useLocalParticipant();
+  const { localParticipant, isMicrophoneEnabled } = useLocalParticipant();
   const [micEnabled, setMicEnabled] = useState(false);
+  const [micLoading, setMicLoading] = useState(false);
+
+  /* Синхронизируем micEnabled с реальным состоянием LiveKit */
+  useEffect(() => {
+    setMicEnabled(!!isMicrophoneEnabled);
+  }, [isMicrophoneEnabled]);
   const [handRaised, setHandRaised] = useState(false);
   const [hasFloor, setHasFloor] = useState(false);
   const [floorHolderId, setFloorHolderId] = useState<string | null>(null);
@@ -503,13 +509,23 @@ function RoomInner({
 
   /* Микрофон */
   const toggleMic = useCallback(async () => {
-    if (!localParticipant) return;
+    if (!localParticipant || micLoading) return;
+    setMicLoading(true);
     try {
       const next = !localParticipant.isMicrophoneEnabled;
       await localParticipant.setMicrophoneEnabled(next);
       setMicEnabled(next);
-    } catch { showToast('Не удалось изменить микрофон'); }
-  }, [localParticipant, showToast]);
+    } catch (err: any) {
+      const msg = err?.name === 'NotAllowedError' || err?.message?.includes('Permission')
+        ? '🚫 Нет доступа к микрофону — разрешите в настройках браузера'
+        : err?.name === 'NotFoundError'
+        ? '🎤 Микрофон не найден — подключите устройство'
+        : '❌ Не удалось включить микрофон';
+      showToast(msg);
+    } finally {
+      setMicLoading(false);
+    }
+  }, [localParticipant, micLoading, showToast]);
 
   const toggleHand = useCallback(async () => {
     if (!localParticipant) return;
@@ -690,14 +706,40 @@ function RoomInner({
       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, flexShrink: 0 }}>
       {/* Микрофон */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-        <motion.button whileTap={{ scale: 0.9 }} onClick={toggleMic}
-          style={{ width: 44, height: 44, borderRadius: '50%', border: 'none', cursor: 'pointer',
-            background: micEnabled ? `linear-gradient(135deg,${ACCENT},#818cf8)` : 'rgba(107,114,128,0.25)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: micEnabled ? `0 0 18px rgba(99,102,241,0.4)` : 'none', transition: 'all 0.25s' }}>
-          <span style={{ fontSize: 18 }}>{micEnabled ? '🎤' : '🔇'}</span>
-        </motion.button>
-        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', fontFamily: 'Montserrat,sans-serif' }}>Микрофон</div>
+        <div style={{ position: 'relative' }}>
+          {micEnabled && (
+            <>
+              <motion.div animate={{ scale: [1, 1.5], opacity: [0.35, 0] }}
+                transition={{ duration: 1.4, repeat: Infinity, ease: 'easeOut' }}
+                style={{ position: 'absolute', inset: -4, borderRadius: '50%',
+                  background: ACCENT, pointerEvents: 'none' }} />
+              <motion.div animate={{ scale: [1, 1.75], opacity: [0.2, 0] }}
+                transition={{ duration: 1.4, repeat: Infinity, ease: 'easeOut', delay: 0.35 }}
+                style={{ position: 'absolute', inset: -4, borderRadius: '50%',
+                  background: ACCENT, pointerEvents: 'none' }} />
+            </>
+          )}
+          <motion.button
+            whileTap={{ scale: 0.88 }}
+            onClick={toggleMic}
+            onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); toggleMic(); }}
+            disabled={micLoading}
+            style={{ width: 44, height: 44, borderRadius: '50%', border: 'none', cursor: 'pointer',
+              background: micEnabled ? `linear-gradient(135deg,${ACCENT},#818cf8)` : 'rgba(107,114,128,0.25)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: micEnabled ? `0 0 18px rgba(99,102,241,0.45)` : 'none',
+              transition: 'all 0.25s', position: 'relative', zIndex: 1,
+              opacity: micLoading ? 0.6 : 1,
+              WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}>
+            <span style={{ fontSize: 18 }}>
+              {micLoading ? '⏳' : micEnabled ? '🎤' : '🔇'}
+            </span>
+          </motion.button>
+        </div>
+        <div style={{ fontSize: 8, color: micEnabled ? 'rgba(165,180,252,0.8)' : 'rgba(255,255,255,0.3)',
+          fontFamily: 'Montserrat,sans-serif', transition: 'color 0.2s' }}>
+          {micEnabled ? 'Вкл' : 'Микрофон'}
+        </div>
       </div>
       {/* Рука — доступна всем включая анонимов */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
