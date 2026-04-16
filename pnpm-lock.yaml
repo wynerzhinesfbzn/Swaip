@@ -437,6 +437,9 @@ importers:
       '@noble/curves':
         specifier: ^2.0.1
         version: 2.2.0
+      fix-webm-duration:
+        specifier: ^1.0.6
+        version: 1.0.6
       livekit-client:
         specifier: ^2.18.1
         version: 2.18.1
@@ -2854,6 +2857,9 @@ packages:
   find-up@8.0.0:
     resolution: {integrity: sha512-JGG8pvDi2C+JxidYdIwQDyS/CgcrIdh18cvgxcBge3wSHRQOrooMD3GlFBcmMJAN9M42SAZjDp5zv1dglJjwww==}
     engines: {node: '>=20'}
+
+  fix-webm-duration@1.0.6:
+    resolution: {integrity: sha512-zVAqi4gE+8ywxJuAyV/rlJVX6CMtvyapEbQx6jyoeX9TMjdqAlt/FdG5d7rXSSkDVzTvS0H7CtwzHcH/vh4FPA==}
 
   form-data@2.5.5:
     resolution: {integrity: sha512-jqdObeR2rxZZbPSGL+3VckHMYtu+f9//KXBsVny6JSX/pa38Fy+bGjuG8eW/H6USNQWhLi8Num++cU2yOCNz4A==}
@@ -6512,6 +6518,8 @@ snapshots:
     dependencies:
       locate-path: 8.0.0
       unicorn-magic: 0.3.0
+
+  fix-webm-duration@1.0.6: {}
 
   form-data@2.5.5:
     dependencies:

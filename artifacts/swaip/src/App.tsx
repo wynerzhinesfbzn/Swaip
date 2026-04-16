@@ -8,6 +8,7 @@ import { useCallSignaling } from './useCallSignaling';
 import type { CallType, UseCallSignalingReturn } from './useCallSignaling';
 import { getTranslations, type T } from './i18n';
 import { getWordList } from './wordLists';
+import fixWebmDuration from 'fix-webm-duration';
 
 /* ─────────────────────────────────────────────────
    HARDWARE / BROWSER BACK BUTTON HANDLING
@@ -21519,7 +21520,8 @@ function FlowScreen({ onBack, userHash, isActive }: { onBack: () => void; userHa
     const [camPreviewUrl,setCamPreviewUrl]= useState<string|null>(null);
     const [camSeconds,   setCamSeconds]   = useState(0);
     const [camError,     setCamError]     = useState<string|null>(null);
-    const camTimerRef = React.useRef<ReturnType<typeof setInterval>|null>(null);
+    const camTimerRef      = React.useRef<ReturnType<typeof setInterval>|null>(null);
+    const camStartTimeRef  = React.useRef<number>(0);
 
     const startCamera = async (facing: 'user'|'environment' = camFacing) => {
       try {
@@ -21558,19 +21560,23 @@ function FlowScreen({ onBack, userHash, isActive }: { onBack: () => void; userHa
         setCamError('Ошибка записи'); setCamRecording(false);
         if (camTimerRef.current) { clearInterval(camTimerRef.current); camTimerRef.current = null; }
       };
-      mr.onstop = () => {
+      mr.onstop = async () => {
         if (camTimerRef.current) { clearInterval(camTimerRef.current); camTimerRef.current = null; }
         setCamRecording(false); setCamSeconds(0);
         const chunks = camChunksRef.current;
         if (chunks.length === 0) { setCamError('Не удалось записать видео'); return; }
         const blobType = mr.mimeType || mimeType || 'video/webm';
-        const blob = new Blob(chunks, { type: blobType });
-        if (blob.size === 0) { setCamError('Запись пустая, попробуй снова'); return; }
-        setCamBlob(blob);
-        setCamPreviewUrl(URL.createObjectURL(blob));
+        const rawBlob = new Blob(chunks, { type: blobType });
+        if (rawBlob.size === 0) { setCamError('Запись пустая, попробуй снова'); return; }
         if (camStreamRef.current) { camStreamRef.current.getTracks().forEach(t => t.stop()); camStreamRef.current = null; }
+        const durationMs = Date.now() - camStartTimeRef.current;
+        let finalBlob = rawBlob;
+        try { finalBlob = await fixWebmDuration(rawBlob, durationMs, { logger: false }); } catch { /* fallback to raw */ }
+        setCamBlob(finalBlob);
+        setCamPreviewUrl(URL.createObjectURL(finalBlob));
       };
       camRecorderRef.current = mr;
+      camStartTimeRef.current = Date.now();
       mr.start();
       setCamRecording(true); setCamSeconds(0);
       camTimerRef.current = setInterval(() => setCamSeconds(s => s + 1), 1000);
