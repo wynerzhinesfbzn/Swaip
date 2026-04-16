@@ -26691,7 +26691,7 @@ function CompassScreen({ onLogout, userHash, pendingChat, onPendingChatOpened }:
                         <div style={{ color:'rgba(255,210,120,0.8)', fontSize:11,
                           fontFamily:'Arial,sans-serif', lineHeight:1.65 }}>
                           {isYandex
-                            ? 'Яндекс браузер не поддерживает установку PWA.\nОткройте сайт в Chrome — там появится кнопка «Установить приложение» и SWAIP откроется без адресной строки.'
+                            ? 'Нажми ⋮ в Яндекс браузере → «Добавить на главный экран» → дождись установки. Если не предлагает — очисти кеш сайта: Настройки → Сайты → SWAIP → Очистить данные.'
                             : 'Откройте сайт в Chrome → меню ⋮ → «Установить приложение» — SWAIP откроется без браузерной строки.'}
                         </div>
                         <div style={{ marginTop:8, fontSize:10, color:'rgba(255,190,60,0.6)',
