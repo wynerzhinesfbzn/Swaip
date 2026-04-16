@@ -685,6 +685,131 @@ router.post("/meetings/:meetingId/whiteboard", async (req, res) => {
 });
 
 /* ──────────────────────────────────────────────────
+ * SLIDES — хранение слайдов презентации в object storage
+ * ────────────────────────────────────────────────── */
+
+interface SlideItem { id: string; url: string; name: string; }
+interface SlidesData { slides: SlideItem[]; current: number; }
+
+async function getSlidesData(meetingId: string): Promise<SlidesData> {
+  try {
+    const bucket = getBucket();
+    const file = bucket.file(`meeting_files/slides_meta_${meetingId}.json`);
+    const [exists] = await file.exists();
+    if (!exists) return { slides: [], current: 0 };
+    const [buf] = await file.download();
+    return JSON.parse(buf.toString("utf-8"));
+  } catch { return { slides: [], current: 0 }; }
+}
+
+async function saveSlidesData(meetingId: string, data: SlidesData): Promise<void> {
+  const bucket = getBucket();
+  const file = bucket.file(`meeting_files/slides_meta_${meetingId}.json`);
+  await file.save(Buffer.from(JSON.stringify(data)), { contentType: "application/json", resumable: false });
+}
+
+/* ──────────────────────────────────────────────────
+ * GET /api/meetings/:meetingId/slides
+ * ────────────────────────────────────────────────── */
+router.get("/meetings/:meetingId/slides", async (req, res) => {
+  const token = req.headers["x-participant-token"] as string;
+  if (!token) return res.status(401).json({ error: "Нет токена" });
+  const parsed = verifyParticipantToken(token);
+  if (!parsed || parsed.meetingId !== req.params.meetingId) return res.status(401).json({ error: "Недействителен" });
+
+  const data = await getSlidesData(req.params.meetingId);
+  return res.json(data);
+});
+
+/* ──────────────────────────────────────────────────
+ * POST /api/meetings/:meetingId/slides/upload
+ * Загрузить изображение как слайд (только ведущий)
+ * ────────────────────────────────────────────────── */
+router.post("/meetings/:meetingId/slides/upload", upload.single("file"), async (req, res) => {
+  const token = req.headers["x-participant-token"] as string;
+  if (!token) return res.status(401).json({ error: "Нет токена" });
+  const parsed = verifyParticipantToken(token);
+  if (!parsed || parsed.meetingId !== req.params.meetingId) return res.status(401).json({ error: "Недействителен" });
+
+  const pRows = await db.select().from(meetingParticipantsTable)
+    .where(eq(meetingParticipantsTable.participantId, parsed.participantId)).limit(1);
+  if (!pRows.length) return res.status(401).json({ error: "Участник не найден" });
+  if (!["host", "co-host"].includes(pRows[0].role)) return res.status(403).json({ error: "Только ведущий может загружать слайды" });
+
+  if (!req.file) return res.status(400).json({ error: "Файл не передан" });
+
+  const allowed = ["image/png", "image/jpeg", "image/webp", "image/gif", "image/bmp"];
+  if (!allowed.includes(req.file.mimetype)) return res.status(400).json({ error: "Только изображения (PNG/JPG/WEBP/GIF)" });
+
+  const ext = req.file.originalname.split(".").pop()?.toLowerCase() || "jpg";
+  const slideId = crypto.randomUUID();
+  const filename = `slide_${req.params.meetingId}_${slideId}.${ext}`;
+  const fileUrl = await uploadMeetingFile(req.file.buffer, filename, req.file.mimetype);
+
+  const data = await getSlidesData(req.params.meetingId);
+  const slideName = (req.body.name as string) || `Слайд ${data.slides.length + 1}`;
+  const slide: SlideItem = { id: slideId, url: fileUrl, name: slideName };
+  data.slides.push(slide);
+  await saveSlidesData(req.params.meetingId, data);
+
+  broadcastToMeeting(req.params.meetingId, { type: "slides_updated", slides: data.slides, current: data.current });
+  return res.json({ slide, slides: data.slides, current: data.current });
+});
+
+/* ──────────────────────────────────────────────────
+ * DELETE /api/meetings/:meetingId/slides/:slideId
+ * ────────────────────────────────────────────────── */
+router.delete("/meetings/:meetingId/slides/:slideId", async (req, res) => {
+  const token = req.headers["x-participant-token"] as string;
+  if (!token) return res.status(401).json({ error: "Нет токена" });
+  const parsed = verifyParticipantToken(token);
+  if (!parsed || parsed.meetingId !== req.params.meetingId) return res.status(401).json({ error: "Недействителен" });
+
+  const pRows = await db.select().from(meetingParticipantsTable)
+    .where(eq(meetingParticipantsTable.participantId, parsed.participantId)).limit(1);
+  if (!pRows.length) return res.status(401).json({ error: "Нет данных" });
+  if (!["host", "co-host"].includes(pRows[0].role)) return res.status(403).json({ error: "Только ведущий" });
+
+  const data = await getSlidesData(req.params.meetingId);
+  const idx = data.slides.findIndex(s => s.id === req.params.slideId);
+  if (idx < 0) return res.status(404).json({ error: "Слайд не найден" });
+  data.slides.splice(idx, 1);
+  if (data.current >= data.slides.length) data.current = Math.max(0, data.slides.length - 1);
+  await saveSlidesData(req.params.meetingId, data);
+
+  broadcastToMeeting(req.params.meetingId, { type: "slides_updated", slides: data.slides, current: data.current });
+  return res.json({ slides: data.slides, current: data.current });
+});
+
+/* ──────────────────────────────────────────────────
+ * PATCH /api/meetings/:meetingId/slides/current
+ * Переключить слайд — транслируется всем участникам
+ * ────────────────────────────────────────────────── */
+router.patch("/meetings/:meetingId/slides/current", async (req, res) => {
+  const token = req.headers["x-participant-token"] as string;
+  if (!token) return res.status(401).json({ error: "Нет токена" });
+  const parsed = verifyParticipantToken(token);
+  if (!parsed || parsed.meetingId !== req.params.meetingId) return res.status(401).json({ error: "Недействителен" });
+
+  const pRows = await db.select().from(meetingParticipantsTable)
+    .where(eq(meetingParticipantsTable.participantId, parsed.participantId)).limit(1);
+  if (!pRows.length) return res.status(401).json({ error: "Нет данных" });
+  if (!["host", "co-host"].includes(pRows[0].role)) return res.status(403).json({ error: "Только ведущий" });
+
+  const { current } = req.body as { current: number };
+  if (typeof current !== "number") return res.status(400).json({ error: "Нет индекса" });
+
+  const data = await getSlidesData(req.params.meetingId);
+  if (data.slides.length === 0) return res.status(400).json({ error: "Нет слайдов" });
+  const clamped = Math.max(0, Math.min(current, data.slides.length - 1));
+  data.current = clamped;
+  await saveSlidesData(req.params.meetingId, data);
+
+  broadcastToMeeting(req.params.meetingId, { type: "slide_navigate", current: clamped });
+  return res.json({ ok: true, current: clamped });
+});
+
+/* ──────────────────────────────────────────────────
  * GET /api/meetings/:meetingId/participants — список участников с ролями
  * ────────────────────────────────────────────────── */
 router.get("/meetings/:meetingId/participants", async (req, res) => {
