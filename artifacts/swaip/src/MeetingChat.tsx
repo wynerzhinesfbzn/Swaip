@@ -333,23 +333,39 @@ export default function MeetingChat({ meetingId, participantToken, myParticipant
       }}>
         {/* Запись голоса (не для анонимов) */}
         {!isAnonymous && (
-          <motion.button
-            whileTap={{ scale: 0.9 }}
-            onPointerDown={startRecording}
-            onPointerUp={stopRecording}
-            onPointerLeave={stopRecording}
-            style={{
-              flexShrink: 0, width: 38, height: 38, borderRadius: '50%', border: 'none',
-              cursor: 'pointer',
-              background: recording ? 'linear-gradient(135deg,#ef4444,#f87171)' : 'rgba(255,255,255,0.07)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: recording ? '0 0 16px rgba(239,68,68,0.5)' : 'none',
-              transition: 'background 0.2s, box-shadow 0.2s',
-            }}
-            title="Удержите для записи голоса"
-          >
-            <span style={{ fontSize: 16 }}>🎙</span>
-          </motion.button>
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            {recording && (
+              <>
+                <motion.div animate={{ scale: [1, 1.6], opacity: [0.4, 0] }}
+                  transition={{ duration: 1.1, repeat: Infinity, ease: 'easeOut' }}
+                  style={{ position: 'absolute', inset: -4, borderRadius: '50%',
+                    background: '#ef4444', pointerEvents: 'none' }} />
+                <motion.div animate={{ scale: [1, 1.9], opacity: [0.2, 0] }}
+                  transition={{ duration: 1.1, repeat: Infinity, ease: 'easeOut', delay: 0.28 }}
+                  style={{ position: 'absolute', inset: -4, borderRadius: '50%',
+                    background: '#ef4444', pointerEvents: 'none' }} />
+              </>
+            )}
+            <motion.button
+              whileTap={{ scale: 0.88 }}
+              onClick={recording ? stopRecording : startRecording}
+              onContextMenu={e => e.preventDefault()}
+              style={{
+                position: 'relative', zIndex: 1,
+                width: 38, height: 38, borderRadius: '50%', border: 'none',
+                cursor: 'pointer',
+                background: recording ? 'linear-gradient(135deg,#ef4444,#f87171)' : 'rgba(255,255,255,0.07)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: recording ? '0 0 16px rgba(239,68,68,0.5)' : 'none',
+                transition: 'background 0.2s, box-shadow 0.2s',
+                userSelect: 'none', WebkitUserSelect: 'none',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+              title={recording ? 'Нажмите чтобы остановить и отправить' : 'Нажмите чтобы начать запись'}
+            >
+              <span style={{ fontSize: 16 }}>{recording ? '⏹' : '🎙'}</span>
+            </motion.button>
+          </div>
         )}
 
         {recording ? (
