@@ -1106,7 +1106,7 @@ export default function MeetingRoom() {
       serverUrl={lkInfo.serverUrl}
       token={lkInfo.token}
       connect={true}
-      audio={true}
+      audio={false}
       video={false}
       options={{ adaptiveStream: true, dynacast: true }}
       style={{ height: '100vh' }}

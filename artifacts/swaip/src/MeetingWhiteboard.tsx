@@ -856,7 +856,7 @@ export default function MeetingWhiteboard({meetingId,participantToken,isHost,wsR
           }}>
             <span>🖼</span>
             <span style={{fontSize:9,fontFamily:'Montserrat,sans-serif',fontWeight:600}}>
-              Слайды{slides.length>0?` (${slides.length})`:''}
+              {showSlides ? '▲ Слайды' : '▼ Слайды'}{slides.length>0?` (${slides.length})`:''}
             </span>
           </button>
 
@@ -901,6 +901,24 @@ export default function MeetingWhiteboard({meetingId,participantToken,isHost,wsR
           flexShrink:0,background:'#fff',borderBottom:'1px solid #e5e7eb',
           padding:'8px 10px',display:'flex',flexDirection:'column',gap:6,
         }}>
+          {/* Header row with collapse button */}
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+            <span style={{fontSize:11,fontWeight:700,color:'#6b7280',fontFamily:'Montserrat,sans-serif',letterSpacing:'0.04em'}}>
+              СЛАЙДЫ{slides.length>0?` · ${currentSlide+1} / ${slides.length}`:''}
+            </span>
+            <button
+              onClick={()=>setShowSlides(false)}
+              style={{
+                display:'flex',alignItems:'center',gap:3,padding:'3px 10px',
+                borderRadius:6,border:'1px solid #e5e7eb',background:'#f9fafb',
+                cursor:'pointer',fontFamily:'Montserrat,sans-serif',fontSize:11,
+                fontWeight:600,color:'#6b7280',
+              }}
+            >
+              ▲ Свернуть
+            </button>
+          </div>
+
           {/* Upload row (host only) */}
           {isHost && (
             <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
