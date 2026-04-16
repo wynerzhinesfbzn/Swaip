@@ -92,6 +92,14 @@ export function attachMeetingChatWs(httpServer: Server) {
           broadcast(meetingId, { type: "role_change", targetId: msg.targetId, role: msg.role });
           return;
         }
+        if (msg.type === "give_floor") {
+          broadcast(meetingId, { type: "give_floor", targetId: msg.targetId, fromId: participantId });
+          return;
+        }
+        if (msg.type === "floor_returned") {
+          broadcast(meetingId, { type: "floor_returned", participantId });
+          return;
+        }
       } catch {}
     });
 

@@ -361,6 +361,8 @@ function RoomInner({
   const { localParticipant } = useLocalParticipant();
   const [micEnabled, setMicEnabled] = useState(false);
   const [handRaised, setHandRaised] = useState(false);
+  const [hasFloor, setHasFloor] = useState(false);
+  const [floorHolderId, setFloorHolderId] = useState<string | null>(null);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
@@ -439,6 +441,21 @@ function RoomInner({
           setMicEnabled(false);
           showToast('🔕 Ведущий отключил все микрофоны');
         }
+        if (msg.type === 'give_floor') {
+          setFloorHolderId(msg.targetId);
+          if (msg.targetId === info.participantId) {
+            setHasFloor(true);
+            setMicEnabled(true);
+            localParticipant?.setMicrophoneEnabled(true).catch(() => {});
+            showToast('🎤 Вам дали слово — говорите!');
+          }
+        }
+        if (msg.type === 'floor_returned') {
+          setFloorHolderId(null);
+          if (msg.participantId === info.participantId) {
+            setHasFloor(false);
+          }
+        }
         if (msg.type === 'role_change' && msg.targetId === info.participantId) {
           setMyRole(msg.role);
           showToast(`Ваша роль изменена: ${msg.role}`);
@@ -510,6 +527,24 @@ function RoomInner({
       showToast('🔕 Запрос на отключение микрофонов отправлен');
     } catch { showToast('Не удалось отправить запрос'); }
   }, [meetingId, participantToken, showToast]);
+
+  const giveFloor = useCallback((targetId: string) => {
+    closeCtx();
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ type: 'give_floor', targetId }));
+  }, [wsRef]);
+
+  const returnFloor = useCallback(async () => {
+    setHasFloor(false);
+    setFloorHolderId(null);
+    setMicEnabled(false);
+    localParticipant?.setMicrophoneEnabled(false).catch(() => {});
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'floor_returned', participantId: info.participantId }));
+    }
+  }, [localParticipant, wsRef, info.participantId]);
 
   const handleLeave = useCallback(async () => {
     try {
@@ -592,10 +627,22 @@ function RoomInner({
 
   /* ── Список участников (источник правды: DB) ── */
   const lkByIdentity = new Map(participants.map(p => [p.identity, p]));
-  const displayList: DbParticipant[] = dbParticipants.length > 0
+  const rawList: DbParticipant[] = dbParticipants.length > 0
     ? dbParticipants
     : [{ participantId: info.participantId, name: info.name, lastName: info.lastName,
          position: info.position || null, isAnonymous: info.isAnonymous ?? false, role: myRole, number: 1 }];
+  /* Участники с поднятой рукой — всегда первые */
+  const displayList = [...rawList].sort((a, b) => {
+    const aRaised = lkByIdentity.get(a.participantId)?.attributes?.handRaised === 'true';
+    const bRaised = lkByIdentity.get(b.participantId)?.attributes?.handRaised === 'true';
+    const aFloor = floorHolderId === a.participantId;
+    const bFloor = floorHolderId === b.participantId;
+    if (aFloor && !bFloor) return -1;
+    if (!aFloor && bFloor) return 1;
+    if (aRaised && !bRaised) return -1;
+    if (!aRaised && bRaised) return 1;
+    return 0;
+  });
 
   /* ── Полоса участников (горизонтальная) ── */
   const participantStrip = (
@@ -607,7 +654,13 @@ function RoomInner({
         const lkParticipant = lkByIdentity.get(dbp.participantId) ?? null;
         const numLabel = dbp.number ?? (idx + 1);
         return (
-          <div key={dbp.participantId} style={{ position: 'relative', flexShrink: 0 }}>
+          <div key={dbp.participantId} style={{
+            position: 'relative', flexShrink: 0,
+            borderRadius: 50,
+            boxShadow: dbp.participantId === floorHolderId
+              ? '0 0 0 3px #10b981, 0 0 16px rgba(16,185,129,0.5)'
+              : 'none',
+          }}>
             {/* Порядковый номер */}
             <div style={{ position: 'absolute', top: -4, left: -4, zIndex: 2,
               width: 18, height: 18, borderRadius: '50%',
@@ -669,6 +722,22 @@ function RoomInner({
           </motion.button>
           <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', fontFamily: 'Montserrat,sans-serif' }}>Тишина</div>
         </div>
+      )}
+      {/* Кнопка "Завершить вопрос" для участника у которого есть слово */}
+      {hasFloor && (
+        <motion.button
+          whileTap={{ scale: 0.93 }}
+          onClick={returnFloor}
+          style={{
+            background: 'linear-gradient(135deg,#10b981,#34d399)',
+            border: 'none', borderRadius: 10, padding: '6px 14px',
+            color: '#fff', fontSize: 11, fontWeight: 800,
+            cursor: 'pointer', fontFamily: 'Montserrat,sans-serif',
+            boxShadow: '0 0 16px rgba(16,185,129,0.5)',
+          }}
+        >
+          ✅ Завершить вопрос
+        </motion.button>
       )}
       {/* Выйти / Завершить */}
       <div style={{ marginLeft: 8, display: 'flex', gap: 8 }}>
@@ -733,6 +802,13 @@ function RoomInner({
               {canAssignRoles && (ctxMenu.targetRole === 'co-host' || ctxMenu.targetRole === 'moderator') && (
                 <CtxItem icon="👤" label="Сделать участником" onClick={() => doRoleChange(ctxMenu.targetId, 'participant')} />
               )}
+              {canAssignRoles && (() => {
+                const lkp = lkByIdentity.get(ctxMenu.targetId);
+                const raised = lkp?.attributes?.handRaised === 'true';
+                return raised ? (
+                  <CtxItem icon="🎙" label="Дать слово" onClick={() => giveFloor(ctxMenu.targetId)} />
+                ) : null;
+              })()}
               <div style={{ margin: '6px 0', borderTop: '1px solid rgba(255,255,255,0.07)' }} />
               <CtxItem icon="🔇" label="Отключить микрофон" onClick={() => { showToast('Запрос на отключение отправлен'); closeCtx(); }} />
               {ctxMenu.targetRole !== 'host' && (
@@ -808,6 +884,15 @@ function RoomInner({
                   display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
                   boxShadow: handRaised ? '0 0 16px rgba(239,68,68,0.4)' : 'none', transition: 'all 0.25s' }}>
                 ✋
+              </motion.button>
+            )}
+            {hasFloor && (
+              <motion.button whileTap={{ scale: 0.93 }} onClick={returnFloor}
+                style={{ background: 'linear-gradient(135deg,#10b981,#34d399)', border: 'none',
+                  borderRadius: 10, padding: '6px 12px', color: '#fff',
+                  fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'Montserrat,sans-serif',
+                  boxShadow: '0 0 14px rgba(16,185,129,0.5)' }}>
+                ✅ Завершить вопрос
               </motion.button>
             )}
             {myRole === 'host' && (
@@ -1109,6 +1194,7 @@ export default function MeetingRoom() {
       audio={false}
       video={false}
       options={{ adaptiveStream: true, dynacast: true }}
+      onError={() => {}}
       style={{ height: '100vh' }}
     >
       <RoomInner
