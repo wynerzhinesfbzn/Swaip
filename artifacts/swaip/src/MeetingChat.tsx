@@ -48,6 +48,7 @@ export default function MeetingChat({ meetingId, participantToken, myParticipant
   const chunksRef = useRef<BlobPart[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const shouldStopRef = useRef(false);
 
   const canDelete = ['host', 'co-host', 'moderator'].includes(myRole);
 
@@ -57,15 +58,26 @@ export default function MeetingChat({ meetingId, participantToken, myParticipant
     }
   }, []);
 
-  useEffect(() => {
+  const fetchMessages = useCallback(() => {
     fetch(`${API}/api/meetings/${meetingId}/messages`, {
       headers: { 'x-participant-token': participantToken },
       credentials: 'include',
     })
       .then(r => r.json())
-      .then(d => { if (d.messages) { setMessages(d.messages); setTimeout(scrollToBottom, 50); } })
+      .then(d => {
+        if (d.messages) {
+          setMessages(d.messages);
+          setTimeout(scrollToBottom, 50);
+        }
+      })
       .catch(() => {});
   }, [meetingId, participantToken, scrollToBottom]);
+
+  useEffect(() => {
+    fetchMessages();
+    const interval = setInterval(fetchMessages, 8000);
+    return () => clearInterval(interval);
+  }, [fetchMessages]);
 
   useEffect(() => {
     const ws = wsRef.current;
@@ -74,8 +86,11 @@ export default function MeetingChat({ meetingId, participantToken, myParticipant
       try {
         const msg = JSON.parse(e.data);
         if (msg.type === 'new_message') {
-          setMessages(prev => [...prev, msg.message]);
-          setTimeout(scrollToBottom, 50);
+          setMessages(prev => {
+            if (prev.some(m => m.id === msg.message.id)) return prev;
+            setTimeout(scrollToBottom, 50);
+            return [...prev, msg.message];
+          });
         } else if (msg.type === 'message_deleted') {
           setMessages(prev => prev.filter(m => m.id !== msg.messageId));
         }
@@ -103,8 +118,11 @@ export default function MeetingChat({ meetingId, participantToken, myParticipant
       if (res.ok) {
         const d = await res.json();
         if (d.message) {
-          setMessages(prev => [...prev, d.message]);
-          setTimeout(scrollToBottom, 50);
+          setMessages(prev => {
+            if (prev.some(m => m.id === d.message.id)) return prev;
+            setTimeout(scrollToBottom, 50);
+            return [...prev, d.message];
+          });
         }
       }
     } catch {}
@@ -120,43 +138,59 @@ export default function MeetingChat({ meetingId, participantToken, myParticipant
   }, [participantToken]);
 
   const startRecording = useCallback(async () => {
+    shouldStopRef.current = false;
+    let stream: MediaStream | null = null;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType =
-        MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' :
-        MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' :
-        MediaRecorder.isTypeSupported('audio/ogg;codecs=opus') ? 'audio/ogg;codecs=opus' :
-        'audio/mp4';
-      const mr = new MediaRecorder(stream, { mimeType });
-      chunksRef.current = [];
-      mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-      mr.onstop = async () => {
-        stream.getTracks().forEach(t => t.stop());
-        const ext = mimeType.includes('ogg') ? 'ogg' : mimeType.includes('mp4') ? 'mp4' : 'webm';
-        const blob = new Blob(chunksRef.current, { type: mimeType });
-        if (blob.size < 500) return;
-        const fd = new FormData();
-        fd.append('file', blob, `voice-${Date.now()}.${ext}`);
-        try {
-          await fetch(`${API}/api/meetings/${meetingId}/messages/upload`, {
-            method: 'POST',
-            headers: { 'x-participant-token': participantToken },
-            credentials: 'include',
-            body: fd,
-          });
-        } catch {}
-      };
-      mr.start();
-      mediaRecorderRef.current = mr;
-      setRecording(true);
-      setRecordingSec(0);
-      timerRef.current = setInterval(() => setRecordingSec(s => s + 1), 1000);
-    } catch {}
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      return;
+    }
+    if (shouldStopRef.current) {
+      stream.getTracks().forEach(t => t.stop());
+      return;
+    }
+    const mimeType =
+      MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' :
+      MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' :
+      MediaRecorder.isTypeSupported('audio/ogg;codecs=opus') ? 'audio/ogg;codecs=opus' :
+      'audio/mp4';
+    const mr = new MediaRecorder(stream, { mimeType });
+    chunksRef.current = [];
+    mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+    mr.onstop = async () => {
+      stream!.getTracks().forEach(t => t.stop());
+      const ext = mimeType.includes('ogg') ? 'ogg' : mimeType.includes('mp4') ? 'mp4' : 'webm';
+      const blob = new Blob(chunksRef.current, { type: mimeType });
+      if (blob.size < 500) return;
+      const fd = new FormData();
+      fd.append('file', blob, `voice-${Date.now()}.${ext}`);
+      try {
+        await fetch(`${API}/api/meetings/${meetingId}/messages/upload`, {
+          method: 'POST',
+          headers: { 'x-participant-token': participantToken },
+          credentials: 'include',
+          body: fd,
+        });
+      } catch {}
+    };
+    mr.start(100);
+    mediaRecorderRef.current = mr;
+    if (shouldStopRef.current) {
+      mr.stop();
+      mediaRecorderRef.current = null;
+      return;
+    }
+    setRecording(true);
+    setRecordingSec(0);
+    timerRef.current = setInterval(() => setRecordingSec(s => s + 1), 1000);
   }, [meetingId, participantToken]);
 
   const stopRecording = useCallback(() => {
-    mediaRecorderRef.current?.stop();
-    mediaRecorderRef.current = null;
+    shouldStopRef.current = true;
+    if (mediaRecorderRef.current) {
+      try { mediaRecorderRef.current.stop(); } catch {}
+      mediaRecorderRef.current = null;
+    }
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     setRecording(false);
     setRecordingSec(0);

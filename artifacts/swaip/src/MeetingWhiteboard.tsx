@@ -1,10 +1,4 @@
 import React, { useEffect, useRef, useCallback, useState, useMemo } from 'react';
-import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
-
-GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url,
-).href;
 
 const API = window.location.origin;
 const SAVE_DEBOUNCE_MS = 2000;
@@ -188,8 +182,15 @@ function renderScene(
 
 /* ── PDF helper ────────────────────────────────────────── */
 async function pdfToJpegBlobs(file: File): Promise<{ blob: Blob; name: string }[]> {
+  const pdfjs = await import('pdfjs-dist');
+  if (!pdfjs.GlobalWorkerOptions.workerSrc) {
+    pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+      'pdfjs-dist/build/pdf.worker.min.mjs',
+      import.meta.url,
+    ).href;
+  }
   const buf = await file.arrayBuffer();
-  const pdf = await getDocument({ data: buf }).promise;
+  const pdf = await pdfjs.getDocument({ data: buf }).promise;
   const results: { blob: Blob; name: string }[] = [];
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p);
