@@ -6026,6 +6026,26 @@ function ProScreen({ onBack, userHash, onInvite, isActive, registerCoverTrigger,
   const [fSlotTime,          setFSlotTime]        = useState('');
   /* ── Голосовое приветствие (запись / воспроизведение) ── */
   const [proGreetingUrl,     setProGreetingUrl]   = usePersistedState<string>('pro_greetingAudioUrl', '', userHash);
+  // ── Видео-визитка у аватара ──
+  type HlMediaItem = { url:string; type:'image'|'video'; caption?:string };
+  type HlItem = { id:string; title:string; emoji:string; coverUrl:string; mediaItems:HlMediaItem[] };
+  const [proVizitkaUrl,      setProVizitkaUrl]    = usePersistedState<string>('pro_vizitka_url', '', userHash);
+  const [showVizitkaPlayer,  setShowVizitkaPlayer] = useState(false);
+  const [vizitkaUploading,   setVizitkaUploading] = useState(false);
+  const vizitkaFileRef = useRef<HTMLInputElement>(null);
+  // ── Хайлайты ──
+  const [proHighlights,      setProHighlights]    = usePersistedState<HlItem[]>('pro_highlights', [], userHash);
+  const [viewingHL,          setViewingHL]        = useState<HlItem|null>(null);
+  const [hlStoryIdx,         setHlStoryIdx]       = useState(0);
+  const [showHlEditor,       setShowHlEditor]     = useState(false);
+  const [hlNewEmoji,         setHlNewEmoji]       = useState('✨');
+  const [hlNewTitle,         setHlNewTitle]       = useState('');
+  const [hlNewCoverUrl,      setHlNewCoverUrl]    = useState('');
+  const [hlUploadingCover,   setHlUploadingCover] = useState(false);
+  const hlCoverRef = useRef<HTMLInputElement>(null);
+  const hlMediaRef = useRef<HTMLInputElement>(null);
+  const [hlEditingId,        setHlEditingId]      = useState<string|null>(null);
+  const [hlMediaUploading,   setHlMediaUploading] = useState(false);
   const [greetRecording,     setGreetRecording]   = useState(false);
   const [greetRecSecs,       setGreetRecSecs]     = useState(0);
   const [greetUploading,     setGreetUploading]   = useState(false);
@@ -7636,6 +7656,8 @@ function ProScreen({ onBack, userHash, onInvite, isActive, registerCoverTrigger,
           { icon:'✨', label:'Новый дизайн', desc: proExtraThemeId ? `Активен: ${PRO_EXTRA_THEMES.find(t=>t.id===proExtraThemeId)?.name??''}` : '15 эксклюзивных PRO-шаблонов', action:() => setShowExtraThemePicker(true) },
           { icon:'📷', label:'Обложка профиля', desc:'Фото или градиент шапки', action:() => setShowCoverPicker(true) },
           { icon:'🎨', label:'Фон ленты', desc:'Цвет или градиент позади постов', action:() => setShowFeedBgPicker(true) },
+          { icon:'🎬', label:'Видео-визитка', desc: proVizitkaUrl ? 'Видео загружено ✓' : 'Короткое видео у аватара', action:() => setShowVizitkaPlayer(true) },
+          { icon:'💫', label:'Хайлайты', desc: proHighlights.length > 0 ? `${proHighlights.length} хайлайт(ов)` : 'Закреплённые истории у профиля', action:() => { setHlNewEmoji('✨'); setHlNewTitle(''); setHlNewCoverUrl(''); setHlEditingId(null); setShowHlEditor(true); } },
         ]} />
 
       {/* ── Баннер: сессия недействительна ── */}
@@ -7826,6 +7848,21 @@ function ProScreen({ onBack, userHash, onInvite, isActive, registerCoverTrigger,
                   background:`linear-gradient(135deg,${ac},${ac2},${ac}88)`,
                   boxShadow:`0 0 0 3px #08081a,0 8px 40px ${ac}55,0 0 60px ${ac}20` }} />
                 {avatarBody(108, 108, 26)}
+                {proVizitkaUrl && (
+                  <motion.div
+                    animate={{ opacity:[0.7,1,0.7] }}
+                    transition={{ repeat:Infinity, duration:2.2, ease:'easeInOut' }}
+                    onClick={e => { e.stopPropagation(); setShowVizitkaPlayer(true); }}
+                    style={{ position:'absolute', inset:-6, borderRadius:32, zIndex:6,
+                      border:'2.5px solid #ff6b6b', background:'transparent',
+                      cursor:'pointer', pointerEvents:'all' }}>
+                    <div style={{ position:'absolute', top:1, left:1, width:24, height:24, borderRadius:'50%',
+                      background:'linear-gradient(135deg,#ff6b6b,#f8a100)',
+                      boxShadow:'0 2px 10px rgba(255,107,107,0.7)',
+                      display:'flex', alignItems:'center', justifyContent:'center',
+                      fontSize:9, color:'#fff', fontWeight:900 }}>▶</div>
+                  </motion.div>
+                )}
                 <div style={{ position:'absolute', bottom:4, right:4, width:22, height:22, borderRadius:8,
                   background:'rgba(15,15,35,0.97)', border:`1.5px solid ${ac}70`,
                   display:'flex', alignItems:'center', justifyContent:'center',
@@ -8990,6 +9027,39 @@ function ProScreen({ onBack, userHash, onInvite, isActive, registerCoverTrigger,
 
         </>)} {/* конец !proClassicThemeId — PRO блоки внутри карточки */}
       </div>
+
+      {/* ── Хайлайты ── */}
+      {!proClassicThemeId && (
+        <div style={{ padding:'14px 0 2px' }}>
+          <div style={{ display:'flex', gap:12, overflowX:'auto', paddingLeft:16, paddingRight:16, paddingBottom:4, scrollbarWidth:'none' as any }}>
+            {proHighlights.map(hl => (
+              <motion.div key={hl.id} whileTap={{ scale:0.92 }}
+                onClick={() => { setViewingHL(hl); setHlStoryIdx(0); }}
+                style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:5, cursor:'pointer', flexShrink:0 }}>
+                <div style={{ width:64, height:64, borderRadius:'50%', flexShrink:0,
+                  background: hl.coverUrl ? `url(${hl.coverUrl}) center/cover no-repeat` : `linear-gradient(135deg,${activeTheme.accent},${activeTheme.accent2})`,
+                  border:`2.5px solid ${activeTheme.accent}`, boxShadow:`0 0 14px ${activeTheme.accent}40`,
+                  display:'flex', alignItems:'center', justifyContent:'center', fontSize:26 }}>
+                  {!hl.coverUrl && hl.emoji}
+                </div>
+                <span style={{ fontSize:10, color:'rgba(255,255,255,0.75)', fontWeight:600,
+                  textAlign:'center', maxWidth:68, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                  {hl.title}
+                </span>
+              </motion.div>
+            ))}
+            <motion.div whileTap={{ scale:0.92 }}
+              onClick={() => { setHlNewEmoji('✨'); setHlNewTitle(''); setHlNewCoverUrl(''); setHlEditingId(null); setShowHlEditor(true); }}
+              style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:5, cursor:'pointer', flexShrink:0 }}>
+              <div style={{ width:64, height:64, borderRadius:'50%',
+                background:'rgba(255,255,255,0.05)', border:'2px dashed rgba(255,255,255,0.2)',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                fontSize:22, color:'rgba(255,255,255,0.4)' }}>+</div>
+              <span style={{ fontSize:10, color:'rgba(255,255,255,0.3)', textAlign:'center' }}>Хайлайт</span>
+            </motion.div>
+          </div>
+        </div>
+      )}
 
       {/* ── Сайт, Соцсети и Контакты — скрыты в классическом режиме ── */}
       {!proClassicThemeId && (<>
@@ -16357,6 +16427,286 @@ function ProScreen({ onBack, userHash, onInvite, isActive, registerCoverTrigger,
                     if(r.ok){const{url}=await r.json();setClassicVideoUrl(url);}
                     setVideoUploading(false); e.target.value='';
                   }} />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+{/* ══ МОДАЛ: Видео-визитка у аватара ══ */}
+      <AnimatePresence>
+        {showVizitkaPlayer && (
+          <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+            style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.88)', zIndex:3000, display:'flex', flexDirection:'column', backdropFilter:'blur(8px)' }}>
+            <motion.div initial={{ y:60, opacity:0 }} animate={{ y:0, opacity:1 }}
+              style={{ position:'absolute', inset:0, background:'#0f0f1a', display:'flex', flexDirection:'column' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:12, padding:'18px 16px 12px', borderBottom:'1px solid rgba(255,255,255,0.08)' }}>
+                <motion.button whileTap={{ scale:0.93 }} onClick={() => setShowVizitkaPlayer(false)}
+                  style={{ background:'none', border:'none', color:'rgba(255,255,255,0.5)', fontSize:22, cursor:'pointer', padding:0 }}>←</motion.button>
+                <div style={{ fontSize:20, fontWeight:900, color:'#fff', flex:1 }}>🎬 Видео-визитка</div>
+              </div>
+              <div style={{ flex:1, overflowY:'auto', padding:'20px 16px', display:'flex', flexDirection:'column', gap:16, alignItems:'center' }}>
+                {proVizitkaUrl ? (
+                  <>
+                    <video src={proVizitkaUrl} controls playsInline style={{ width:'100%', maxWidth:400, borderRadius:16, background:'#000', maxHeight:'55vh' }} />
+                    <div style={{ display:'flex', gap:10, flexWrap:'wrap', justifyContent:'center' }}>
+                      <motion.button whileTap={{ scale:0.95 }} onClick={() => vizitkaFileRef.current?.click()}
+                        style={{ background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:12, padding:'11px 22px', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer' }}>
+                        🔄 Заменить
+                      </motion.button>
+                      <motion.button whileTap={{ scale:0.95 }} onClick={() => { setProVizitkaUrl(''); setShowVizitkaPlayer(false); }}
+                        style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.25)', borderRadius:12, padding:'11px 22px', color:'#f87171', fontSize:13, fontWeight:700, cursor:'pointer' }}>
+                        🗑️ Удалить
+                      </motion.button>
+                    </div>
+                    <div style={{ fontSize:11, color:'rgba(255,255,255,0.3)', textAlign:'center' }}>
+                      Посетители увидят кольцо ▶ на вашем аватаре и смогут нажать для просмотра
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ textAlign:'center', padding:'40px 20px' }}>
+                    <div style={{ fontSize:64, marginBottom:16 }}>🎬</div>
+                    <div style={{ fontSize:16, fontWeight:700, color:'#fff', marginBottom:8 }}>Видео-визитка не загружена</div>
+                    <div style={{ fontSize:13, color:'rgba(255,255,255,0.4)', marginBottom:24, lineHeight:1.5 }}>Загрузите короткое видео-приветствие.<br/>Оно появится как кольцо ▶ вокруг аватара.</div>
+                    <motion.button whileTap={{ scale:0.95 }} onClick={() => vizitkaFileRef.current?.click()}
+                      style={{ background:'linear-gradient(135deg,#ff6b6b,#f8a100)', border:'none', borderRadius:14, padding:'14px 32px', color:'#fff', fontSize:15, fontWeight:800, cursor:'pointer' }}>
+                      {vizitkaUploading ? '⏳ Загрузка...' : '📤 Загрузить видео'}
+                    </motion.button>
+                  </div>
+                )}
+                <input ref={vizitkaFileRef} type="file" accept="video/*" style={{ display:'none' }}
+                  onChange={async e => {
+                    const f=e.target.files?.[0]; if(!f) return;
+                    setVizitkaUploading(true);
+                    const fd=new FormData(); fd.append('file', f);
+                    const r=await fetch(`${window.location.origin}/api/video-upload`,{method:'POST',body:fd});
+                    if(r.ok){const{url}=await r.json();setProVizitkaUrl(url);}
+                    setVizitkaUploading(false); e.target.value='';
+                  }} />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+{/* ══ МОДАЛ: Просмотр хайлайта (история) ══ */}
+      <AnimatePresence>
+        {viewingHL && (
+          <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+            style={{ position:'fixed', inset:0, background:'#000', zIndex:4000, display:'flex', flexDirection:'column' }}>
+            {/* Полосы прогресса */}
+            <div style={{ display:'flex', gap:3, padding:'52px 12px 8px', flexShrink:0 }}>
+              {viewingHL.mediaItems.map((_, i) => (
+                <div key={i} style={{ flex:1, height:3, borderRadius:2,
+                  background: i < hlStoryIdx ? 'rgba(255,255,255,0.9)' : i===hlStoryIdx ? activeTheme.accent : 'rgba(255,255,255,0.25)' }} />
+              ))}
+              {viewingHL.mediaItems.length === 0 && (
+                <div style={{ flex:1, height:3, borderRadius:2, background:'rgba(255,255,255,0.25)' }} />
+              )}
+            </div>
+            {/* Шапка */}
+            <div style={{ display:'flex', alignItems:'center', gap:10, padding:'4px 16px 8px', flexShrink:0 }}>
+              <div style={{ width:38, height:38, borderRadius:'50%', flexShrink:0,
+                background: viewingHL.coverUrl ? `url(${viewingHL.coverUrl}) center/cover no-repeat` : `linear-gradient(135deg,${activeTheme.accent},${activeTheme.accent2})`,
+                display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>
+                {!viewingHL.coverUrl && viewingHL.emoji}
+              </div>
+              <span style={{ color:'#fff', fontWeight:700, fontSize:15, flex:1 }}>{viewingHL.title}</span>
+              <motion.button whileTap={{ scale:0.88 }} onClick={() => setViewingHL(null)}
+                style={{ background:'rgba(255,255,255,0.12)', border:'none', borderRadius:'50%', width:34, height:34,
+                  color:'#fff', fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>✕</motion.button>
+            </div>
+            {/* Медиа */}
+            {viewingHL.mediaItems.length === 0 ? (
+              <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14 }}>
+                <div style={{ fontSize:48 }}>📷</div>
+                <div style={{ color:'rgba(255,255,255,0.4)', fontSize:14 }}>Нет фото/видео в хайлайте</div>
+                <motion.button whileTap={{ scale:0.95 }} onClick={() => { setViewingHL(null); setHlEditingId(viewingHL.id); setShowHlEditor(true); }}
+                  style={{ background:activeTheme.accent, border:'none', borderRadius:12, padding:'10px 24px', color:'#000', fontWeight:700, cursor:'pointer', fontSize:13 }}>
+                  + Добавить медиа
+                </motion.button>
+              </div>
+            ) : (
+              <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', position:'relative', overflow:'hidden' }}
+                onClick={e => {
+                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                  if (e.clientX < rect.left + rect.width/2) {
+                    setHlStoryIdx(i => Math.max(0, i-1));
+                  } else {
+                    const next = hlStoryIdx + 1;
+                    if (next >= viewingHL.mediaItems.length) setViewingHL(null);
+                    else setHlStoryIdx(next);
+                  }
+                }}>
+                {viewingHL.mediaItems[hlStoryIdx]?.type === 'video'
+                  ? <video key={viewingHL.mediaItems[hlStoryIdx].url} src={viewingHL.mediaItems[hlStoryIdx].url} autoPlay playsInline muted loop
+                      style={{ maxWidth:'100%', maxHeight:'100%', objectFit:'contain' }} />
+                  : <img key={viewingHL.mediaItems[hlStoryIdx]?.url} src={viewingHL.mediaItems[hlStoryIdx]?.url} alt=""
+                      style={{ maxWidth:'100%', maxHeight:'100%', objectFit:'contain' }} />
+                }
+                {viewingHL.mediaItems[hlStoryIdx]?.caption && (
+                  <div style={{ position:'absolute', bottom:20, left:16, right:16,
+                    background:'rgba(0,0,0,0.65)', borderRadius:10, padding:'8px 14px',
+                    color:'#fff', fontSize:14, textAlign:'center', backdropFilter:'blur(4px)' }}>
+                    {viewingHL.mediaItems[hlStoryIdx].caption}
+                  </div>
+                )}
+                {/* Редактировать хайлайт (только владелец) */}
+                <motion.button whileTap={{ scale:0.9 }}
+                  onClick={e => { e.stopPropagation(); setViewingHL(null); setHlEditingId(viewingHL.id); setHlNewEmoji(viewingHL.emoji); setHlNewTitle(viewingHL.title); setHlNewCoverUrl(viewingHL.coverUrl); setShowHlEditor(true); }}
+                  style={{ position:'absolute', top:4, right:4, background:'rgba(255,255,255,0.15)', border:'none', borderRadius:10, padding:'6px 12px', color:'#fff', fontSize:11, fontWeight:700, cursor:'pointer' }}>✏️ Изменить</motion.button>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+{/* ══ МОДАЛ: Редактор хайлайтов ══ */}
+      <AnimatePresence>
+        {showHlEditor && (
+          <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+            style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.88)', zIndex:3500, display:'flex', flexDirection:'column', backdropFilter:'blur(8px)' }}>
+            <motion.div initial={{ y:60, opacity:0 }} animate={{ y:0, opacity:1 }}
+              style={{ position:'absolute', inset:0, background:'#0f0f1a', display:'flex', flexDirection:'column' }}>
+              {/* Шапка */}
+              <div style={{ display:'flex', alignItems:'center', gap:12, padding:'18px 16px 12px', borderBottom:'1px solid rgba(255,255,255,0.08)', flexShrink:0 }}>
+                <motion.button whileTap={{ scale:0.93 }} onClick={() => { setShowHlEditor(false); setHlEditingId(null); }}
+                  style={{ background:'none', border:'none', color:'rgba(255,255,255,0.5)', fontSize:22, cursor:'pointer', padding:0 }}>←</motion.button>
+                <div style={{ fontSize:18, fontWeight:900, color:'#fff', flex:1 }}>💫 {hlEditingId ? 'Редактировать хайлайт' : 'Новый хайлайт'}</div>
+              </div>
+              <div style={{ flex:1, overflowY:'auto', padding:'20px 16px', display:'flex', flexDirection:'column', gap:18 }}>
+                {/* Форма нового / редактирование */}
+                <div style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.10)', borderRadius:16, padding:'16px' }}>
+                  <div style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.45)', marginBottom:10, textTransform:'uppercase', letterSpacing:'0.06em' }}>Название и эмодзи</div>
+                  <div style={{ display:'flex', gap:10, alignItems:'center' }}>
+                    {/* Эмодзи-picker простой */}
+                    <div style={{ position:'relative' }}>
+                      <input value={hlNewEmoji} onChange={e => setHlNewEmoji(e.target.value.slice(-2)||'✨')}
+                        style={{ width:52, height:52, borderRadius:'50%', background:`linear-gradient(135deg,${activeTheme.accent},${activeTheme.accent2})`,
+                          border:'none', outline:'none', textAlign:'center', fontSize:26, cursor:'pointer', color:'#fff' }} />
+                    </div>
+                    <input value={hlNewTitle} onChange={e => setHlNewTitle(e.target.value)}
+                      placeholder="Название хайлайта"
+                      style={{ flex:1, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)',
+                        borderRadius:10, padding:'12px 14px', color:'#fff', fontSize:14, outline:'none' }} />
+                  </div>
+                </div>
+                {/* Обложка */}
+                <div style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.10)', borderRadius:16, padding:'16px' }}>
+                  <div style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.45)', marginBottom:10, textTransform:'uppercase', letterSpacing:'0.06em' }}>Обложка (необязательно)</div>
+                  <div style={{ display:'flex', gap:12, alignItems:'center' }}>
+                    <div style={{ width:60, height:60, borderRadius:'50%', flexShrink:0,
+                      background: hlNewCoverUrl ? `url(${hlNewCoverUrl}) center/cover no-repeat` : `linear-gradient(135deg,${activeTheme.accent},${activeTheme.accent2})`,
+                      display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>
+                      {!hlNewCoverUrl && hlNewEmoji}
+                    </div>
+                    <motion.button whileTap={{ scale:0.95 }} onClick={() => hlCoverRef.current?.click()}
+                      style={{ background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:10, padding:'10px 18px', color:'#fff', fontSize:13, fontWeight:600, cursor:'pointer' }}>
+                      {hlUploadingCover ? '⏳...' : hlNewCoverUrl ? '🔄 Заменить' : '📷 Загрузить'}
+                    </motion.button>
+                    {hlNewCoverUrl && <motion.button whileTap={{ scale:0.95 }} onClick={() => setHlNewCoverUrl('')}
+                      style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.25)', borderRadius:10, padding:'10px 14px', color:'#f87171', fontSize:13, cursor:'pointer' }}>🗑️</motion.button>}
+                  </div>
+                  <input ref={hlCoverRef} type="file" accept="image/*" style={{ display:'none' }}
+                    onChange={async e => {
+                      const f=e.target.files?.[0]; if(!f) return;
+                      setHlUploadingCover(true);
+                      const r=await fetch(`${window.location.origin}/api/image-upload`,{method:'POST',headers:{'Content-Type':f.type},body:f});
+                      if(r.ok){const{url}=await r.json();setHlNewCoverUrl(url);}
+                      setHlUploadingCover(false); e.target.value='';
+                    }} />
+                </div>
+                {/* Кнопки: сохранить / удалить */}
+                <motion.button whileTap={{ scale:0.96 }}
+                  onClick={() => {
+                    if (!hlNewTitle.trim()) return;
+                    if (hlEditingId) {
+                      setProHighlights(prev => prev.map(h => h.id===hlEditingId ? { ...h, title:hlNewTitle.trim(), emoji:hlNewEmoji, coverUrl:hlNewCoverUrl } : h));
+                    } else {
+                      const newHl: HlItem = { id: Date.now().toString(), title:hlNewTitle.trim(), emoji:hlNewEmoji, coverUrl:hlNewCoverUrl, mediaItems:[] };
+                      setProHighlights(prev => [...prev, newHl]);
+                    }
+                    setShowHlEditor(false); setHlEditingId(null);
+                  }}
+                  style={{ background:`linear-gradient(135deg,${activeTheme.accent},${activeTheme.accent2})`, border:'none', borderRadius:14, padding:'14px 24px', color:'#fff', fontSize:15, fontWeight:800, cursor:'pointer' }}>
+                  {hlEditingId ? '✓ Сохранить' : '+ Создать хайлайт'}
+                </motion.button>
+                {hlEditingId && (
+                  <motion.button whileTap={{ scale:0.96 }}
+                    onClick={() => {
+                      setProHighlights(prev => prev.filter(h => h.id!==hlEditingId));
+                      setShowHlEditor(false); setHlEditingId(null);
+                    }}
+                    style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.25)', borderRadius:14, padding:'12px 24px', color:'#f87171', fontSize:14, fontWeight:700, cursor:'pointer' }}>
+                    🗑️ Удалить хайлайт
+                  </motion.button>
+                )}
+                {/* Медиа хайлайта */}
+                {hlEditingId && (() => {
+                  const hl = proHighlights.find(h => h.id === hlEditingId);
+                  if (!hl) return null;
+                  return (
+                    <div>
+                      <div style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.45)', marginBottom:10, textTransform:'uppercase', letterSpacing:'0.06em' }}>Медиа хайлайта ({hl.mediaItems.length} шт.)</div>
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:12 }}>
+                        {hl.mediaItems.map((mi, idx) => (
+                          <div key={idx} style={{ position:'relative', width:80, height:80, borderRadius:10, overflow:'hidden' }}>
+                            {mi.type==='video'
+                              ? <video src={mi.url} style={{ width:'100%', height:'100%', objectFit:'cover' }} muted />
+                              : <img src={mi.url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                            }
+                            <motion.button whileTap={{ scale:0.9 }}
+                              onClick={() => setProHighlights(prev => prev.map(h => h.id===hlEditingId ? { ...h, mediaItems: h.mediaItems.filter((_,i)=>i!==idx) } : h))}
+                              style={{ position:'absolute', top:2, right:2, background:'rgba(0,0,0,0.7)', border:'none', borderRadius:'50%', width:20, height:20, color:'#fff', fontSize:11, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>✕</motion.button>
+                          </div>
+                        ))}
+                      </div>
+                      <motion.button whileTap={{ scale:0.95 }} onClick={() => hlMediaRef.current?.click()}
+                        style={{ background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:10, padding:'10px 18px', color:'#fff', fontSize:13, fontWeight:600, cursor:'pointer' }}>
+                        {hlMediaUploading ? '⏳ Загрузка...' : '+ Добавить фото/видео'}
+                      </motion.button>
+                      <input ref={hlMediaRef} type="file" accept="image/*,video/*" style={{ display:'none' }}
+                        onChange={async e => {
+                          const f=e.target.files?.[0]; if(!f) return;
+                          setHlMediaUploading(true);
+                          const isImg=f.type.startsWith('image/');
+                          let url='';
+                          if(isImg){
+                            const r=await fetch(`${window.location.origin}/api/image-upload`,{method:'POST',headers:{'Content-Type':f.type},body:f});
+                            if(r.ok){const d=await r.json();url=d.url;}
+                          } else {
+                            const fd=new FormData(); fd.append('file',f);
+                            const r=await fetch(`${window.location.origin}/api/video-upload`,{method:'POST',body:fd});
+                            if(r.ok){const d=await r.json();url=d.url;}
+                          }
+                          if(url) setProHighlights(prev => prev.map(h => h.id===hlEditingId ? { ...h, mediaItems: [...h.mediaItems, {url, type:(isImg?'image':'video') as 'image'|'video'}] } : h));
+                          setHlMediaUploading(false); e.target.value='';
+                        }} />
+                    </div>
+                  );
+                })()}
+                {/* Список существующих хайлайтов */}
+                {!hlEditingId && proHighlights.length > 0 && (
+                  <div>
+                    <div style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.45)', marginBottom:10, textTransform:'uppercase', letterSpacing:'0.06em' }}>Ваши хайлайты</div>
+                    {proHighlights.map(hl => (
+                      <div key={hl.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 0', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
+                        <div style={{ width:44, height:44, borderRadius:'50%', flexShrink:0,
+                          background: hl.coverUrl ? `url(${hl.coverUrl}) center/cover no-repeat` : `linear-gradient(135deg,${activeTheme.accent},${activeTheme.accent2})`,
+                          display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>
+                          {!hl.coverUrl && hl.emoji}
+                        </div>
+                        <div style={{ flex:1 }}>
+                          <div style={{ color:'#fff', fontWeight:700, fontSize:14 }}>{hl.title}</div>
+                          <div style={{ color:'rgba(255,255,255,0.4)', fontSize:11 }}>{hl.mediaItems.length} медиа</div>
+                        </div>
+                        <motion.button whileTap={{ scale:0.9 }}
+                          onClick={() => { setHlEditingId(hl.id); setHlNewEmoji(hl.emoji); setHlNewTitle(hl.title); setHlNewCoverUrl(hl.coverUrl); }}
+                          style={{ background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:8, padding:'6px 14px', color:'#fff', fontSize:12, fontWeight:600, cursor:'pointer' }}>✏️ Изменить</motion.button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </motion.div>
           </motion.div>
@@ -26963,6 +27313,12 @@ function GuestProfileScreen({ hash, mode, onJoin, onLogin, onOpenChat, onCall, m
   };
   const [gBroadcasts,    setGBroadcasts]    = useState<GBroadcast[]>([]);
   const [gGreetingUrl,   setGGreetingUrl]   = useState<string>('');
+  const [gVizitkaUrl,    setGVizitkaUrl]    = useState('');
+  const [gShowVizitka,   setGShowVizitka]   = useState(false);
+  type GHlItem = { id:string; title:string; emoji:string; coverUrl:string; mediaItems:{url:string;type:'image'|'video';caption?:string}[] };
+  const [gHighlights,    setGHighlights]    = useState<GHlItem[]>([]);
+  const [gViewingHL,     setGViewingHL]     = useState<GHlItem|null>(null);
+  const [gHlStoryIdx,    setGHlStoryIdx]    = useState(0);
   const [greetPlaying,   setGreetPlaying]   = useState(false);
   const [greetMuted,     setGreetMuted]     = useState(false);
   const [greetLoadError, setGreetLoadError] = useState(false);
@@ -27485,6 +27841,11 @@ function GuestProfileScreen({ hash, mode, onJoin, onLogin, onOpenChat, onCall, m
           /* Голосовое приветствие */
           const greetUrl = str(get('pro_greetingAudioUrl'));
           setGGreetingUrl(greetUrl || '');
+          /* Видео-визитка у аватара */
+          setGVizitkaUrl(str(get('pro_vizitka_url')));
+          /* Хайлайты */
+          const rawGHl = get('pro_highlights');
+          if (Array.isArray(rawGHl)) setGHighlights(rawGHl as GHlItem[]);
         } else {
           setName(str(get('krug_displayName')) || 'Участник Круга');
           setBio(str(get('krug_bio')));
@@ -28236,6 +28597,21 @@ function GuestProfileScreen({ hash, mode, onJoin, onLogin, onOpenChat, onCall, m
                     background:`linear-gradient(135deg,${ac},${ac2},${ac}88)`,
                     boxShadow:`0 0 0 3px #03050f,0 8px 40px ${ac}55,0 0 60px ${ac}20` }} />
                   {avatarImg(108, 108, 26)}
+                  {gVizitkaUrl && (
+                    <motion.div
+                      animate={{ opacity:[0.7,1,0.7] }}
+                      transition={{ repeat:Infinity, duration:2.2, ease:'easeInOut' }}
+                      onClick={() => setGShowVizitka(true)}
+                      style={{ position:'absolute', inset:-6, borderRadius:32, zIndex:6,
+                        border:'2.5px solid #ff6b6b', background:'transparent',
+                        cursor:'pointer', pointerEvents:'all' }}>
+                      <div style={{ position:'absolute', top:1, left:1, width:24, height:24, borderRadius:'50%',
+                        background:'linear-gradient(135deg,#ff6b6b,#f8a100)',
+                        boxShadow:'0 2px 10px rgba(255,107,107,0.7)',
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        fontSize:9, color:'#fff', fontWeight:900 }}>▶</div>
+                    </motion.div>
+                  )}
                 </div>
               </div>
             );
@@ -28491,6 +28867,30 @@ function GuestProfileScreen({ hash, mode, onJoin, onLogin, onOpenChat, onCall, m
             {bio}
           </div>
         )}
+        {/* Хайлайты гостевого профиля */}
+        {!gClassicThemeId && effectiveMode === 'pro' && gHighlights.length > 0 && (
+          <div style={{ width:'100%', padding:'10px 0 6px' }}>
+            <div style={{ display:'flex', gap:12, overflowX:'auto', paddingLeft:16, paddingRight:16, justifyContent: gHighlights.length < 5 ? 'center' : 'flex-start', scrollbarWidth:'none' as any }}>
+              {gHighlights.map(hl => (
+                <motion.div key={hl.id} whileTap={{ scale:0.92 }}
+                  onClick={() => { setGViewingHL(hl); setGHlStoryIdx(0); }}
+                  style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:5, cursor:'pointer', flexShrink:0 }}>
+                  <div style={{ width:62, height:62, borderRadius:'50%',
+                    background: hl.coverUrl ? `url(${hl.coverUrl}) center/cover no-repeat` : `linear-gradient(135deg,${accent},${gActiveTheme.accent2})`,
+                    border:`2.5px solid ${accent}`, boxShadow:`0 0 12px ${accent}40`,
+                    display:'flex', alignItems:'center', justifyContent:'center', fontSize:24 }}>
+                    {!hl.coverUrl && hl.emoji}
+                  </div>
+                  <span style={{ fontSize:10, color:'rgba(255,255,255,0.72)', fontWeight:600,
+                    textAlign:'center', maxWidth:66, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                    {hl.title}
+                  </span>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Сайт */}
         {!(gClassicThemeId && effectiveMode === 'pro') && website && (
           <div style={{ marginBottom:6 }}>
@@ -31460,6 +31860,88 @@ function GuestProfileScreen({ hash, mode, onJoin, onLogin, onOpenChat, onCall, m
               <video src={gVideoUrl} controls autoPlay playsInline
                 style={{ maxWidth:'100%', maxHeight:'100%', borderRadius:16, background:'#000' }} />
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ══ Видео-визитка у аватара — гость смотрит ══ */}
+      <AnimatePresence>
+        {gShowVizitka && gVizitkaUrl && (
+          <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+            onClick={() => setGShowVizitka(false)}
+            style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.96)', zIndex:9500,
+              display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center' }}>
+            <motion.div initial={{ scale:0.9 }} animate={{ scale:1 }} onClick={e => e.stopPropagation()}
+              style={{ width:'100%', maxWidth:420, padding:'0 16px', position:'relative' }}>
+              <motion.button whileTap={{ scale:0.9 }} onClick={() => setGShowVizitka(false)}
+                style={{ position:'absolute', top:-44, right:16, background:'rgba(255,255,255,0.12)', border:'none',
+                  borderRadius:'50%', width:36, height:36, color:'#fff', fontSize:20, cursor:'pointer',
+                  display:'flex', alignItems:'center', justifyContent:'center' }}>✕</motion.button>
+              <video src={gVizitkaUrl} controls autoPlay playsInline
+                style={{ width:'100%', borderRadius:18, maxHeight:'72vh', background:'#000' }} />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ══ Хайлайты — история (гостевой просмотр) ══ */}
+      <AnimatePresence>
+        {gViewingHL && (
+          <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+            style={{ position:'fixed', inset:0, background:'#000', zIndex:9600, display:'flex', flexDirection:'column' }}>
+            {/* Полосы прогресса */}
+            <div style={{ display:'flex', gap:3, padding:'52px 12px 8px', flexShrink:0 }}>
+              {(gViewingHL.mediaItems.length > 0 ? gViewingHL.mediaItems : [{}]).map((_, i) => (
+                <div key={i} style={{ flex:1, height:3, borderRadius:2,
+                  background: i < gHlStoryIdx ? 'rgba(255,255,255,0.9)' : i===gHlStoryIdx ? accent : 'rgba(255,255,255,0.25)' }} />
+              ))}
+            </div>
+            {/* Шапка */}
+            <div style={{ display:'flex', alignItems:'center', gap:10, padding:'4px 16px 8px', flexShrink:0 }}>
+              <div style={{ width:38, height:38, borderRadius:'50%', flexShrink:0,
+                background: gViewingHL.coverUrl ? `url(${gViewingHL.coverUrl}) center/cover no-repeat` : `linear-gradient(135deg,${accent},${gActiveTheme.accent2})`,
+                display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>
+                {!gViewingHL.coverUrl && gViewingHL.emoji}
+              </div>
+              <span style={{ color:'#fff', fontWeight:700, fontSize:15, flex:1 }}>{gViewingHL.title}</span>
+              <motion.button whileTap={{ scale:0.88 }} onClick={() => setGViewingHL(null)}
+                style={{ background:'rgba(255,255,255,0.12)', border:'none', borderRadius:'50%',
+                  width:34, height:34, color:'#fff', fontSize:18, cursor:'pointer',
+                  display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>✕</motion.button>
+            </div>
+            {/* Медиа */}
+            {gViewingHL.mediaItems.length === 0 ? (
+              <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:12 }}>
+                <div style={{ fontSize:48 }}>📷</div>
+                <div style={{ color:'rgba(255,255,255,0.45)', fontSize:14 }}>Медиа пока нет</div>
+              </div>
+            ) : (
+              <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', position:'relative', overflow:'hidden' }}
+                onClick={e => {
+                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                  if (e.clientX < rect.left + rect.width/2) {
+                    setGHlStoryIdx(i => Math.max(0, i-1));
+                  } else {
+                    const next = gHlStoryIdx + 1;
+                    if (next >= gViewingHL.mediaItems.length) setGViewingHL(null);
+                    else setGHlStoryIdx(next);
+                  }
+                }}>
+                {gViewingHL.mediaItems[gHlStoryIdx]?.type === 'video'
+                  ? <video key={gViewingHL.mediaItems[gHlStoryIdx].url} src={gViewingHL.mediaItems[gHlStoryIdx].url} autoPlay playsInline muted loop
+                      style={{ maxWidth:'100%', maxHeight:'100%', objectFit:'contain' }} />
+                  : <img key={gViewingHL.mediaItems[gHlStoryIdx]?.url} src={gViewingHL.mediaItems[gHlStoryIdx]?.url} alt=""
+                      style={{ maxWidth:'100%', maxHeight:'100%', objectFit:'contain' }} />
+                }
+                {gViewingHL.mediaItems[gHlStoryIdx]?.caption && (
+                  <div style={{ position:'absolute', bottom:20, left:16, right:16,
+                    background:'rgba(0,0,0,0.65)', borderRadius:10, padding:'8px 14px',
+                    color:'#fff', fontSize:14, textAlign:'center', backdropFilter:'blur(4px)' }}>
+                    {gViewingHL.mediaItems[gHlStoryIdx].caption}
+                  </div>
+                )}
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
