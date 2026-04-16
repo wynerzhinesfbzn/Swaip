@@ -47,3 +47,7 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Вложения из чата Replit (скриншоты, фото, видео) — не нужны в репозитории
+attached_assets/
+screenshots/
