@@ -21518,6 +21518,7 @@ function FlowScreen({ onBack, userHash, isActive }: { onBack: () => void; userHa
     const [camBlob,      setCamBlob]      = useState<Blob|null>(null);
     const [camPreviewUrl,setCamPreviewUrl]= useState<string|null>(null);
     const [camSeconds,   setCamSeconds]   = useState(0);
+    const [camError,     setCamError]     = useState<string|null>(null);
     const camTimerRef = React.useRef<ReturnType<typeof setInterval>|null>(null);
 
     const startCamera = async (facing: 'user'|'environment' = camFacing) => {
@@ -21538,43 +21539,59 @@ function FlowScreen({ onBack, userHash, isActive }: { onBack: () => void; userHa
       setCamFacing(next); startCamera(next);
     };
     const startRecording = () => {
-      if (!camStreamRef.current) return;
+      const stream = camStreamRef.current;
+      if (!stream) { setCamError('Камера не запущена'); return; }
+      setCamError(null);
       camChunksRef.current = [];
-      const mimeType = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4']
-        .find(t => MediaRecorder.isTypeSupported(t)) || '';
+      const preferred = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4',''];
+      const mimeType = preferred.find(t => t === '' || MediaRecorder.isTypeSupported(t)) ?? '';
       let mr: MediaRecorder;
       try {
-        mr = new MediaRecorder(camStreamRef.current, mimeType ? { mimeType } : {});
-      } catch { return; }
-      mr.ondataavailable = e => { if (e.data && e.data.size > 0) camChunksRef.current.push(e.data); };
+        mr = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+      } catch (err) {
+        setCamError('Браузер не поддерживает запись'); return;
+      }
+      mr.ondataavailable = (e: BlobEvent) => {
+        if (e.data && e.data.size > 0) camChunksRef.current.push(e.data);
+      };
+      mr.onerror = () => {
+        setCamError('Ошибка записи'); setCamRecording(false);
+        if (camTimerRef.current) { clearInterval(camTimerRef.current); camTimerRef.current = null; }
+      };
       mr.onstop = () => {
-        const finalMime = mimeType || 'video/webm';
-        const blob = new Blob(camChunksRef.current, { type: finalMime });
-        if (blob.size === 0) return;
-        setCamBlob(blob);
-        const url = URL.createObjectURL(blob);
-        setCamPreviewUrl(url);
         if (camTimerRef.current) { clearInterval(camTimerRef.current); camTimerRef.current = null; }
         setCamRecording(false); setCamSeconds(0);
+        const chunks = camChunksRef.current;
+        if (chunks.length === 0) { setCamError('Не удалось записать видео'); return; }
+        const blobType = mr.mimeType || mimeType || 'video/webm';
+        const blob = new Blob(chunks, { type: blobType });
+        if (blob.size === 0) { setCamError('Запись пустая, попробуй снова'); return; }
+        setCamBlob(blob);
+        setCamPreviewUrl(URL.createObjectURL(blob));
         if (camStreamRef.current) { camStreamRef.current.getTracks().forEach(t => t.stop()); camStreamRef.current = null; }
       };
-      mr.start(100);
       camRecorderRef.current = mr;
+      mr.start();
       setCamRecording(true); setCamSeconds(0);
-      camTimerRef.current = setInterval(() => setCamSeconds(s => s+1), 1000);
+      camTimerRef.current = setInterval(() => setCamSeconds(s => s + 1), 1000);
     };
     const stopRecording = () => {
-      camRecorderRef.current?.stop();
+      const mr = camRecorderRef.current;
+      if (!mr || mr.state === 'inactive') return;
       if (camTimerRef.current) { clearInterval(camTimerRef.current); camTimerRef.current = null; }
+      mr.requestData();
+      mr.stop();
     };
     const resetCamRecording = () => {
       if (camPreviewUrl) URL.revokeObjectURL(camPreviewUrl);
-      setCamBlob(null); setCamPreviewUrl(null); setCamRecording(false); setCamSeconds(0);
+      setCamBlob(null); setCamPreviewUrl(null); setCamRecording(false); setCamSeconds(0); setCamError(null);
       startCamera();
     };
     const uploadCamRecording = async () => {
       if (!camBlob) return;
-      const file = new File([camBlob], `story_${Date.now()}.webm`, { type:'video/webm' });
+      const blobType = camBlob.type || 'video/webm';
+      const ext = blobType.includes('mp4') ? 'mp4' : 'webm';
+      const file = new File([camBlob], `story_${Date.now()}.${ext}`, { type: blobType });
       await submitStory('video', file);
     };
 
@@ -22152,6 +22169,15 @@ function FlowScreen({ onBack, userHash, isActive }: { onBack: () => void; userHa
                       {/* Живой Preview */}
                       <video ref={camVideoRef} autoPlay muted playsInline
                         style={{ width:'100%', height:'100%', objectFit:'cover', transform: camFacing==='user' ? 'scaleX(-1)' : 'none', flex:1 }} />
+
+                      {/* Сообщение об ошибке */}
+                      {camError && (
+                        <div style={{ position:'absolute', top:16, left:12, right:12, zIndex:10,
+                          background:'rgba(220,38,38,0.92)', borderRadius:12, padding:'10px 16px',
+                          color:'#fff', fontWeight:700, fontSize:13, textAlign:'center', backdropFilter:'blur(4px)' }}>
+                          ⚠️ {camError}
+                        </div>
+                      )}
 
                       {/* Таймер записи */}
                       {camRecording && (
