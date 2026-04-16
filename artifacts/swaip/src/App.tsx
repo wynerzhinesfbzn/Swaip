@@ -21448,7 +21448,41 @@ function shuffleArr<T>(arr: T[]): T[] {
   const a = [...arr]; for (let i = a.length-1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a;
 }
 
-function FlowScreen({ onBack, userHash }: { onBack: () => void; userHash: string }) {
+const STORY_GRADS = [
+  'linear-gradient(135deg,#ff6b6b,#ffd93d)',
+  'linear-gradient(135deg,#6bcaff,#a855f7)',
+  'linear-gradient(135deg,#4ade80,#06b6d4)',
+  'linear-gradient(135deg,#f472b6,#f59e0b)',
+  'linear-gradient(135deg,#818cf8,#e879f9)',
+  'linear-gradient(135deg,#34d399,#60a5fa)',
+  'linear-gradient(135deg,#fb923c,#f43f5e)',
+];
+function storyGrad(hash: string) {
+  let n = 0; for (let i = 0; i < hash.length; i++) n += hash.charCodeAt(i);
+  return STORY_GRADS[n % STORY_GRADS.length];
+}
+
+type StoryItem = {
+  id: number; authorHash: string; authorMode: string;
+  mediaType: 'video'|'image'|'text';
+  mediaUrl?: string|null; textContent?: string|null; bgGradient?: string|null;
+  expiresAt: string; createdAt: string;
+};
+type StoryGroup = {
+  authorHash: string; authorMode: string;
+  authorName: string; authorAvatar: string; authorHandle: string;
+  stories: StoryItem[];
+};
+
+const TEXT_BG_OPTIONS = [
+  'linear-gradient(135deg,#1e003f,#5b21b6)',
+  'linear-gradient(135deg,#003d1f,#065f46)',
+  'linear-gradient(135deg,#3d0012,#7f1d1d)',
+  'linear-gradient(135deg,#001a3d,#1d4ed8)',
+  'linear-gradient(135deg,#1a001a,#6d28d9)',
+];
+
+function FlowScreen({ onBack, userHash, isActive }: { onBack: () => void; userHash: string; isActive?: boolean }) {
     const PURPLE = '#a78bfa';
   const { t } = useLang();
     const GREEN  = '#22c55e';
@@ -21458,6 +21492,90 @@ function FlowScreen({ onBack, userHash }: { onBack: () => void; userHash: string
     const [broadcasts, setBroadcasts] = useState<BroadcastPost[]>([]);
     const [openCommentId, setOpenCommentId] = useState<number|null>(null);
     const [likedCards, setLikedCards] = useState<Set<string>>(new Set());
+
+    /* ── Истории ── */
+    const [storyGroups, setStoryGroups] = useState<StoryGroup[]>([]);
+    const [viewingGroup, setViewingGroup] = useState<StoryGroup|null>(null);
+    const [viewingGroupIdx, setViewingGroupIdx] = useState(0);
+    const [viewingStoryIdx, setViewingStoryIdx] = useState(0);
+    const [showStoryCreator, setShowStoryCreator] = useState(false);
+    const [storyMediaType, setStoryMediaType] = useState<'video'|'image'|'text'>('text');
+    const [storyText, setStoryText] = useState('');
+    const [storyBgIdx, setStoryBgIdx] = useState(0);
+    const [storyUploading, setStoryUploading] = useState(false);
+    const storyFileRef = React.useRef<HTMLInputElement>(null);
+
+    const loadStories = async () => {
+      try {
+        const res = await fetch(`${window.location.origin}/api/stories`, { headers:{'x-session-token': getST()} });
+        if (!res.ok) return;
+        const { groups } = await res.json();
+        if (Array.isArray(groups)) setStoryGroups(groups as StoryGroup[]);
+      } catch { /* ignore */ }
+    };
+
+    useEffect(() => {
+      loadStories();
+      const iv = setInterval(loadStories, 60000);
+      return () => clearInterval(iv);
+    }, []);
+
+    const openStoryGroup = (group: StoryGroup, groupIdx: number) => {
+      setViewingGroup(group); setViewingGroupIdx(groupIdx); setViewingStoryIdx(0);
+    };
+    const closeStoryViewer = () => setViewingGroup(null);
+    const goNextStory = () => {
+      if (!viewingGroup) return;
+      if (viewingStoryIdx < viewingGroup.stories.length - 1) {
+        setViewingStoryIdx(i => i + 1);
+      } else {
+        const nextGroup = storyGroups[viewingGroupIdx + 1];
+        if (nextGroup) { setViewingGroup(nextGroup); setViewingGroupIdx(i => i+1); setViewingStoryIdx(0); }
+        else closeStoryViewer();
+      }
+    };
+    const goPrevStory = () => {
+      if (!viewingGroup) return;
+      if (viewingStoryIdx > 0) { setViewingStoryIdx(i => i - 1); }
+      else {
+        const prevGroup = storyGroups[viewingGroupIdx - 1];
+        if (prevGroup) { setViewingGroup(prevGroup); setViewingGroupIdx(i => i-1); setViewingStoryIdx(0); }
+      }
+    };
+
+    const submitStory = async (mediaType: 'video'|'image'|'text', file?: File) => {
+      setStoryUploading(true);
+      try {
+        let mediaUrl: string|undefined;
+        if (file) {
+          const fd = new FormData();
+          fd.append('file', file);
+          const endpoint = mediaType === 'video' ? '/api/video-upload' : '/api/image-upload';
+          const up = await fetch(`${window.location.origin}${endpoint}`, {
+            method:'POST', headers:{'x-session-token': getST()}, body: fd
+          });
+          if (!up.ok) throw new Error('upload failed');
+          const { url } = await up.json();
+          mediaUrl = url;
+        }
+        const body: Record<string,string> = { mediaType };
+        if (mediaUrl) body.mediaUrl = mediaUrl;
+        if (mediaType === 'text') { body.textContent = storyText; body.bgGradient = TEXT_BG_OPTIONS[storyBgIdx]; }
+        const res = await fetch(`${window.location.origin}/api/stories`, {
+          method:'POST', headers:{'content-type':'application/json','x-session-token': getST()},
+          body: JSON.stringify(body)
+        });
+        if (res.ok) { setShowStoryCreator(false); setStoryText(''); await loadStories(); }
+      } catch { /* ignore */ }
+      finally { setStoryUploading(false); }
+    };
+
+    const deleteStory = async (storyId: number) => {
+      await fetch(`${window.location.origin}/api/stories/${storyId}`, {
+        method:'DELETE', headers:{'x-session-token': getST()}
+      });
+      await loadStories();
+    };
 
     useEffect(() => {
       const load = async () => {
@@ -21500,7 +21618,7 @@ function FlowScreen({ onBack, userHash }: { onBack: () => void; userHash: string
     const kindIcon: Record<string, string> = { account:'👤', shop:'🛒', post:'📝', news:'📰' };
     const activeCatLabel = FLOW_INTERESTS.find(i => i.id === smartCat)?.label;
 
-    return (
+    return (<>
       <div style={{ minHeight:'100vh', background:'linear-gradient(180deg,#070a18 0%,#0a0d1f 100%)',
         display:'flex', flexDirection:'column', fontFamily:'"Montserrat",sans-serif' }}>
 
@@ -21760,8 +21878,248 @@ function FlowScreen({ onBack, userHash }: { onBack: () => void; userHash: string
               accent="#00e5ff" onClose={() => setOpenCommentId(null)} />
           )}
         </AnimatePresence>
+
+        {/* Отступ снизу для полоски историй */}
+        <div style={{ height: 118 }} />
       </div>
-    );
+
+      {/* ════════════════════════════════════════════
+          ПОЛОСКА ИСТОРИЙ — СНИЗУ (fixed)
+          ════════════════════════════════════════════ */}
+      {isActive !== false && (
+        <div style={{ position:'fixed', bottom:0, left:0, right:0, zIndex:40,
+          background:'rgba(7,10,24,0.97)', borderTop:'1px solid rgba(167,139,250,0.18)',
+          backdropFilter:'blur(18px)', padding:'8px 0 calc(env(safe-area-inset-bottom,0px) + 8px)' }}>
+          <div style={{ display:'flex', gap:10, overflowX:'auto', padding:'0 12px',
+            scrollbarWidth:'none' as any }}>
+
+            {/* ── Кнопка «+ Добавить историю» ── */}
+            <motion.div whileTap={{ scale:0.9 }} onClick={() => setShowStoryCreator(true)}
+              style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4, cursor:'pointer', flexShrink:0 }}>
+              <div style={{ width:72, height:72, borderRadius:14, flexShrink:0,
+                background:'linear-gradient(135deg,rgba(167,139,250,0.18),rgba(167,139,250,0.06))',
+                border:'2px dashed rgba(167,139,250,0.5)',
+                display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2 }}>
+                <span style={{ fontSize:22, lineHeight:1 }}>+</span>
+                <span style={{ fontSize:8, color:'rgba(167,139,250,0.8)', fontWeight:700, letterSpacing:'0.05em' }}>ИСТОРИЯ</span>
+              </div>
+              <span style={{ fontSize:9, color:'rgba(255,255,255,0.4)', fontWeight:600, maxWidth:72, textAlign:'center', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>Ты</span>
+            </motion.div>
+
+            {/* ── Квадратики по авторам ── */}
+            {storyGroups.map((group, gi) => (
+              <motion.div key={group.authorHash} whileTap={{ scale:0.9 }}
+                onClick={() => openStoryGroup(group, gi)}
+                style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4, cursor:'pointer', flexShrink:0 }}>
+                <div style={{ width:72, height:72, borderRadius:14, flexShrink:0, position:'relative', overflow:'hidden',
+                  background: storyGrad(group.authorHash),
+                  boxShadow:`0 0 18px ${STORY_GRADS[0]}60` }}>
+                  {/* Аватар в углу */}
+                  {group.authorAvatar ? (
+                    <img src={group.authorAvatar} alt="" style={{ position:'absolute', top:5, left:5,
+                      width:22, height:22, borderRadius:'50%', border:'2px solid rgba(0,0,0,0.5)', objectFit:'cover' }} />
+                  ) : (
+                    <div style={{ position:'absolute', top:5, left:5, width:22, height:22, borderRadius:'50%',
+                      background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11 }}>👤</div>
+                  )}
+                  {/* Счётчик историй */}
+                  {group.stories.length > 1 && (
+                    <div style={{ position:'absolute', top:5, right:5, background:'rgba(0,0,0,0.55)',
+                      borderRadius:8, padding:'1px 5px', fontSize:9, color:'#fff', fontWeight:800 }}>
+                      {group.stories.length}
+                    </div>
+                  )}
+                  {/* SWAIP текст */}
+                  <div style={{ position:'absolute', bottom:5, left:0, right:0, textAlign:'center' }}>
+                    <span style={{ fontSize:13, fontWeight:900, letterSpacing:'0.14em',
+                      background:'linear-gradient(90deg,#fff,#d8b4fe,#93c5fd,#86efac,#fde68a)',
+                      WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent',
+                      textShadow:'none', fontFamily:'"Montserrat",sans-serif' }}>SWAIP</span>
+                  </div>
+                </div>
+                <span style={{ fontSize:9, color:'rgba(255,255,255,0.55)', fontWeight:600,
+                  maxWidth:72, textAlign:'center', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                  {group.authorName}
+                </span>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ════════ ПРОСМОТРЩИК ИСТОРИЙ ════════ */}
+      <AnimatePresence>
+        {viewingGroup && (
+          <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+            style={{ position:'fixed', inset:0, background:'#000', zIndex:9700,
+              display:'flex', flexDirection:'column', userSelect:'none' }}>
+
+            {/* Прогресс-бары */}
+            <div style={{ display:'flex', gap:3, padding:'52px 12px 6px', flexShrink:0 }}>
+              {viewingGroup.stories.map((_, i) => (
+                <div key={i} style={{ flex:1, height:3, borderRadius:2,
+                  background: i < viewingStoryIdx ? 'rgba(255,255,255,0.85)' : i === viewingStoryIdx ? PURPLE : 'rgba(255,255,255,0.2)' }} />
+              ))}
+            </div>
+
+            {/* Шапка */}
+            <div style={{ display:'flex', alignItems:'center', gap:10, padding:'4px 14px 6px', flexShrink:0 }}>
+              {viewingGroup.authorAvatar ? (
+                <img src={viewingGroup.authorAvatar} alt="" style={{ width:38, height:38, borderRadius:'50%', objectFit:'cover', border:`2px solid ${PURPLE}` }} />
+              ) : (
+                <div style={{ width:38, height:38, borderRadius:'50%', background: storyGrad(viewingGroup.authorHash),
+                  display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>👤</div>
+              )}
+              <div style={{ flex:1 }}>
+                <div style={{ color:'#fff', fontWeight:700, fontSize:14, lineHeight:1.2 }}>{viewingGroup.authorName}</div>
+                {viewingGroup.authorHandle && (
+                  <div style={{ color:'rgba(255,255,255,0.5)', fontSize:11 }}>@{viewingGroup.authorHandle}</div>
+                )}
+              </div>
+              <motion.button whileTap={{ scale:0.9 }} onClick={closeStoryViewer}
+                style={{ background:'rgba(255,255,255,0.12)', border:'none', borderRadius:'50%',
+                  width:34, height:34, color:'#fff', fontSize:18, cursor:'pointer',
+                  display:'flex', alignItems:'center', justifyContent:'center' }}>✕</motion.button>
+            </div>
+
+            {/* Медиа — занимает всё оставшееся пространство */}
+            {(() => {
+              const s = viewingGroup.stories[viewingStoryIdx];
+              if (!s) return null;
+              return (
+                <div style={{ flex:1, position:'relative', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden' }}
+                  onClick={e => {
+                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    if (e.clientX < rect.left + rect.width / 2) goPrevStory();
+                    else goNextStory();
+                  }}>
+                  {s.mediaType === 'video' && s.mediaUrl && (
+                    <video key={s.mediaUrl} src={s.mediaUrl} autoPlay playsInline muted loop
+                      style={{ maxWidth:'100%', maxHeight:'100%', objectFit:'contain', pointerEvents:'none' }} />
+                  )}
+                  {s.mediaType === 'image' && s.mediaUrl && (
+                    <img key={s.mediaUrl} src={s.mediaUrl} alt=""
+                      style={{ maxWidth:'100%', maxHeight:'100%', objectFit:'contain', pointerEvents:'none' }} />
+                  )}
+                  {s.mediaType === 'text' && (
+                    <div style={{ width:'100%', height:'100%', background: s.bgGradient || 'linear-gradient(135deg,#1e003f,#5b21b6)',
+                      display:'flex', alignItems:'center', justifyContent:'center', padding:32, pointerEvents:'none' }}>
+                      <p style={{ color:'#fff', fontSize:22, fontWeight:700, textAlign:'center', lineHeight:1.5,
+                        fontFamily:'"Montserrat",sans-serif', textShadow:'0 2px 12px rgba(0,0,0,0.6)' }}>
+                        {s.textContent}
+                      </p>
+                    </div>
+                  )}
+                  {/* Удалить (только своя история) */}
+                  {s.authorHash === userHash && (
+                    <motion.button whileTap={{ scale:0.88 }}
+                      onClick={e => { e.stopPropagation(); deleteStory(s.id).then(closeStoryViewer); }}
+                      style={{ position:'absolute', bottom:16, right:16, background:'rgba(220,38,38,0.75)',
+                        border:'none', borderRadius:10, padding:'7px 14px', color:'#fff', fontSize:12,
+                        fontWeight:700, cursor:'pointer', backdropFilter:'blur(4px)' }}>🗑 Удалить</motion.button>
+                  )}
+                  {/* Навигация стрелки */}
+                  <div style={{ position:'absolute', left:0, top:0, bottom:0, width:'48%', pointerEvents:'none' }} />
+                  <div style={{ position:'absolute', right:0, top:0, bottom:0, width:'48%', pointerEvents:'none' }} />
+                </div>
+              );
+            })()}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ════════ СОЗДАТЕЛЬ ИСТОРИЙ ════════ */}
+      <AnimatePresence>
+        {showStoryCreator && (
+          <motion.div initial={{ opacity:0, y:60 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:60 }}
+            style={{ position:'fixed', inset:0, zIndex:9800, background:'rgba(7,10,24,0.97)',
+              display:'flex', flexDirection:'column' }}>
+            {/* Шапка создателя */}
+            <div style={{ display:'flex', alignItems:'center', gap:12, padding:'56px 16px 16px',
+              borderBottom:'1px solid rgba(255,255,255,0.08)' }}>
+              <motion.button whileTap={{ scale:0.9 }} onClick={() => setShowStoryCreator(false)}
+                style={{ width:36, height:36, borderRadius:'50%', background:'rgba(255,255,255,0.07)',
+                  border:'none', color:'#fff', fontSize:18, cursor:'pointer',
+                  display:'flex', alignItems:'center', justifyContent:'center' }}>←</motion.button>
+              <span style={{ fontSize:18, fontWeight:900, color:PURPLE, letterSpacing:'0.12em' }}>НОВАЯ ИСТОРИЯ</span>
+            </div>
+
+            {/* Выбор типа */}
+            <div style={{ display:'flex', gap:10, padding:'16px 16px 0' }}>
+              {(['video','image','text'] as const).map(type => (
+                <motion.button key={type} whileTap={{ scale:0.93 }}
+                  onClick={() => setStoryMediaType(type)}
+                  style={{ flex:1, padding:'10px 0', borderRadius:14,
+                    background: storyMediaType === type ? `${PURPLE}22` : 'rgba(255,255,255,0.04)',
+                    border: storyMediaType === type ? `2px solid ${PURPLE}` : '1px solid rgba(255,255,255,0.1)',
+                    color: storyMediaType === type ? PURPLE : 'rgba(255,255,255,0.6)',
+                    fontWeight:800, fontSize:12, cursor:'pointer', fontFamily:'"Montserrat",sans-serif' }}>
+                  {type === 'video' ? '🎬 Видео' : type === 'image' ? '🖼 Фото' : '✍️ Текст'}
+                </motion.button>
+              ))}
+            </div>
+
+            {/* Контент по типу */}
+            <div style={{ flex:1, padding:'20px 16px', display:'flex', flexDirection:'column', gap:14, overflowY:'auto' }}>
+              {(storyMediaType === 'video' || storyMediaType === 'image') && (
+                <>
+                  <input ref={storyFileRef} type="file" accept={storyMediaType === 'video' ? 'video/*' : 'image/*'}
+                    style={{ display:'none' }}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) submitStory(storyMediaType, f); }} />
+                  <motion.button whileTap={{ scale:0.95 }} onClick={() => storyFileRef.current?.click()}
+                    disabled={storyUploading}
+                    style={{ width:'100%', padding:'48px 20px', borderRadius:20,
+                      background:'rgba(167,139,250,0.07)', border:'2px dashed rgba(167,139,250,0.4)',
+                      color: storyUploading ? 'rgba(255,255,255,0.3)' : PURPLE,
+                      fontSize:16, fontWeight:700, cursor: storyUploading ? 'not-allowed' : 'pointer',
+                      display:'flex', flexDirection:'column', alignItems:'center', gap:8 }}>
+                    <span style={{ fontSize:36 }}>{storyMediaType === 'video' ? '🎬' : '🖼'}</span>
+                    <span>{storyUploading ? 'Загрузка...' : `Выбрать ${storyMediaType === 'video' ? 'видео' : 'фото'}`}</span>
+                    <span style={{ fontSize:11, color:'rgba(255,255,255,0.35)', fontWeight:500 }}>
+                      История исчезнет через 24 часа
+                    </span>
+                  </motion.button>
+                </>
+              )}
+
+              {storyMediaType === 'text' && (
+                <>
+                  <div style={{ borderRadius:20, overflow:'hidden', background: TEXT_BG_OPTIONS[storyBgIdx],
+                    padding:24, minHeight:200, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    <textarea value={storyText} onChange={e => setStoryText(e.target.value)}
+                      placeholder="Напишите что-нибудь..."
+                      style={{ background:'transparent', border:'none', outline:'none', resize:'none',
+                        color:'#fff', fontSize:20, fontWeight:700, textAlign:'center',
+                        fontFamily:'"Montserrat",sans-serif', width:'100%', minHeight:140,
+                        textShadow:'0 2px 8px rgba(0,0,0,0.5)' }} />
+                  </div>
+                  {/* Выбор фона */}
+                  <div style={{ display:'flex', gap:8 }}>
+                    {TEXT_BG_OPTIONS.map((bg, i) => (
+                      <motion.button key={i} whileTap={{ scale:0.88 }}
+                        onClick={() => setStoryBgIdx(i)}
+                        style={{ flex:1, height:32, borderRadius:8, background:bg, cursor:'pointer',
+                          border: storyBgIdx===i ? '3px solid #fff' : '2px solid transparent' }} />
+                    ))}
+                  </div>
+                  <motion.button whileTap={{ scale:0.95 }}
+                    onClick={() => { if (storyText.trim()) submitStory('text'); }}
+                    disabled={!storyText.trim() || storyUploading}
+                    style={{ width:'100%', padding:'14px 0', borderRadius:14,
+                      background: storyText.trim() ? PURPLE : 'rgba(167,139,250,0.2)',
+                      border:'none', color:'#fff', fontSize:15, fontWeight:800,
+                      cursor: storyText.trim() ? 'pointer' : 'not-allowed',
+                      fontFamily:'"Montserrat",sans-serif' }}>
+                    {storyUploading ? 'Публикация...' : 'Опубликовать историю'}
+                  </motion.button>
+                </>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+    </>);
   }
 
   
@@ -26397,7 +26755,7 @@ function CompassScreen({ onLogout, userHash, pendingChat, onPendingChatOpened }:
         transition={{ duration:0.32, ease:'easeOut' }}
         style={{ position:'absolute', inset:0, overflowY:'auto', overflowX:'hidden',
           pointerEvents: currentMode==='flow' ? 'all' : 'none', zIndex: currentMode==='flow'?10:5 }}>
-        <FlowScreen onBack={() => setCurrentMode('compass')} userHash={userHash} />
+        <FlowScreen onBack={() => setCurrentMode('compass')} userHash={userHash} isActive={currentMode === 'flow'} />
       </motion.div>
 
       {/* ПОИСК */}

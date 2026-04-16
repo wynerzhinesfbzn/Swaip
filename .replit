@@ -1,4 +1,4 @@
-modules = ["nodejs-24"]
+modules = ["nodejs-24", "postgresql-16"]
 
 [deployment]
 router = "application"
@@ -61,3 +61,6 @@ externalPort = 4200
 NODE_ENV = "production"
 LIVEKIT_URL = "wss://swaip1987-2ns25r0o.livekit.cloud"
 LIVEKIT_API_KEY = "APIcweMpxGZRJp7"
+
+[nix]
+channel = "stable-25_05"

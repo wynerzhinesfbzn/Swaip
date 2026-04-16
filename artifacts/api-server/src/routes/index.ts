@@ -15,6 +15,7 @@ import chunkUploadRouter from "./chunkUpload";
 import storageRouter from "./storage";
 import reviewsRouter from "./reviews";
 import meetingsRouter from "./meetings";
+import storiesRouter from "./stories";
 
 const router: IRouter = Router();
 
@@ -34,5 +35,6 @@ router.use(videoUploadRouter);
 router.use(documentUploadRouter);
 router.use(chunkUploadRouter);
 router.use(storageRouter);
+router.use(storiesRouter);
 
 export default router;
