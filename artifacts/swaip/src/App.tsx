@@ -26653,31 +26653,55 @@ function CompassScreen({ onLogout, userHash, pendingChat, onPendingChatOpened }:
                 <div style={{ padding:'12px 14px', borderTop:'1px solid rgba(255,255,255,0.07)', display:'flex', flexDirection:'column', gap:8 }}>
 
                   {/* Кнопка установки PWA */}
-                  {!isPWA && installPrompt && (
-                    <motion.button whileTap={{ scale:0.97 }} onClick={doInstall}
-                      style={{ width:'100%', padding:'11px', background:'rgba(0,180,255,0.08)',
-                        border:'1px solid rgba(0,200,255,0.35)', borderRadius:10, color:'rgba(0,220,255,0.85)',
-                        fontSize:12, fontWeight:700, fontFamily:'Montserrat,sans-serif',
-                        letterSpacing:'0.05em', cursor:'pointer' }}>
-                      {'📲 '+t.add_to_home_screen}
-                    </motion.button>
-                  )}
-                  {!isPWA && isIOSDevice && (
-                    <div style={{ padding:'10px', background:'rgba(0,180,255,0.06)',
-                      border:'1px solid rgba(0,200,255,0.25)', borderRadius:10, textAlign:'center' }}>
-                      <div style={{ color:'rgba(0,210,255,0.8)', fontSize:11, fontFamily:'Arial,sans-serif', lineHeight:1.6 }}>
-                        📲 <strong>{t.install_app}:</strong><br/>
-                        {t.share+' → «'+t.add_to_home.replace('📲 ','')+'»'}
+                  {(() => {
+                    const isYandex = /YaBrowser/i.test(navigator.userAgent);
+                    const isSamsungOrOther = !isIOSDevice && !installPrompt && !isYandex;
+                    if (isPWA) return (
+                      <div style={{ padding:'9px 12px', background:'rgba(0,255,150,0.06)',
+                        border:'1px solid rgba(0,255,150,0.2)', borderRadius:10, textAlign:'center',
+                        color:'rgba(0,220,150,0.75)', fontSize:11, fontFamily:'Arial,sans-serif' }}>
+                        ✅ Приложение установлено на устройство
                       </div>
-                    </div>
-                  )}
-                  {isPWA && (
-                    <div style={{ padding:'9px 12px', background:'rgba(0,255,150,0.06)',
-                      border:'1px solid rgba(0,255,150,0.2)', borderRadius:10, textAlign:'center',
-                      color:'rgba(0,220,150,0.75)', fontSize:11, fontFamily:'Arial,sans-serif' }}>
-                      ✅ Приложение установлено на устройство
-                    </div>
-                  )}
+                    );
+                    if (!isIOSDevice && installPrompt) return (
+                      <motion.button whileTap={{ scale:0.97 }} onClick={doInstall}
+                        style={{ width:'100%', padding:'11px', background:'rgba(0,180,255,0.08)',
+                          border:'1px solid rgba(0,200,255,0.35)', borderRadius:10, color:'rgba(0,220,255,0.85)',
+                          fontSize:12, fontWeight:700, fontFamily:'Montserrat,sans-serif',
+                          letterSpacing:'0.05em', cursor:'pointer' }}>
+                        {'📲 '+t.add_to_home_screen}
+                      </motion.button>
+                    );
+                    if (isIOSDevice) return (
+                      <div style={{ padding:'10px', background:'rgba(0,180,255,0.06)',
+                        border:'1px solid rgba(0,200,255,0.25)', borderRadius:10, textAlign:'center' }}>
+                        <div style={{ color:'rgba(0,210,255,0.8)', fontSize:11, fontFamily:'Arial,sans-serif', lineHeight:1.6 }}>
+                          📲 <strong>{t.install_app}:</strong><br/>
+                          {t.share+' → «'+t.add_to_home.replace('📲 ','')+'»'}
+                        </div>
+                      </div>
+                    );
+                    if (isYandex || isSamsungOrOther) return (
+                      <div style={{ padding:'12px 14px', background:'rgba(255,160,0,0.06)',
+                        border:'1px solid rgba(255,180,0,0.3)', borderRadius:10 }}>
+                        <div style={{ color:'rgba(255,200,80,0.95)', fontSize:12, fontWeight:700,
+                          fontFamily:'Montserrat,sans-serif', marginBottom:6 }}>
+                          📲 Установка как приложение
+                        </div>
+                        <div style={{ color:'rgba(255,210,120,0.8)', fontSize:11,
+                          fontFamily:'Arial,sans-serif', lineHeight:1.65 }}>
+                          {isYandex
+                            ? 'Яндекс браузер не поддерживает установку PWA.\nОткройте сайт в Chrome — там появится кнопка «Установить приложение» и SWAIP откроется без адресной строки.'
+                            : 'Откройте сайт в Chrome → меню ⋮ → «Установить приложение» — SWAIP откроется без браузерной строки.'}
+                        </div>
+                        <div style={{ marginTop:8, fontSize:10, color:'rgba(255,190,60,0.6)',
+                          fontFamily:'Arial,sans-serif' }}>
+                          system-swaip.replit.app
+                        </div>
+                      </div>
+                    );
+                    return null;
+                  })()}
 
                   <motion.button whileTap={{ scale:0.97 }}
                     onClick={async () => {
