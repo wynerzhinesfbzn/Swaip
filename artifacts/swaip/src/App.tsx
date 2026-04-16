@@ -21538,16 +21538,25 @@ function FlowScreen({ onBack, userHash, isActive }: { onBack: () => void; userHa
     const startRecording = () => {
       if (!camStreamRef.current) return;
       camChunksRef.current = [];
-      const mr = new MediaRecorder(camStreamRef.current, { mimeType: 'video/webm;codecs=vp8,opus' });
-      mr.ondataavailable = e => { if (e.data.size > 0) camChunksRef.current.push(e.data); };
+      const mimeType = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4']
+        .find(t => MediaRecorder.isTypeSupported(t)) || '';
+      let mr: MediaRecorder;
+      try {
+        mr = new MediaRecorder(camStreamRef.current, mimeType ? { mimeType } : {});
+      } catch { return; }
+      mr.ondataavailable = e => { if (e.data && e.data.size > 0) camChunksRef.current.push(e.data); };
       mr.onstop = () => {
-        const blob = new Blob(camChunksRef.current, { type:'video/webm' });
+        const finalMime = mimeType || 'video/webm';
+        const blob = new Blob(camChunksRef.current, { type: finalMime });
+        if (blob.size === 0) return;
         setCamBlob(blob);
         const url = URL.createObjectURL(blob);
         setCamPreviewUrl(url);
-        stopCamera();
+        if (camTimerRef.current) { clearInterval(camTimerRef.current); camTimerRef.current = null; }
+        setCamRecording(false); setCamSeconds(0);
+        if (camStreamRef.current) { camStreamRef.current.getTracks().forEach(t => t.stop()); camStreamRef.current = null; }
       };
-      mr.start(200);
+      mr.start(100);
       camRecorderRef.current = mr;
       setCamRecording(true); setCamSeconds(0);
       camTimerRef.current = setInterval(() => setCamSeconds(s => s+1), 1000);
@@ -22139,10 +22148,7 @@ function FlowScreen({ onBack, userHash, isActive }: { onBack: () => void; userHa
                   {!camPreviewUrl ? (
                     <>
                       {/* Живой Preview */}
-                      <video ref={el => {
-                        (camVideoRef as any).current = el;
-                        if (el && camStreamRef.current) el.srcObject = camStreamRef.current;
-                      }} autoPlay muted playsInline
+                      <video ref={camVideoRef} autoPlay muted playsInline
                         style={{ width:'100%', height:'100%', objectFit:'cover', transform: camFacing==='user' ? 'scaleX(-1)' : 'none', flex:1 }} />
 
                       {/* Таймер записи */}
