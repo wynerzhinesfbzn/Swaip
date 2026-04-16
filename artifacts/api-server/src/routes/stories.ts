@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, accountsTable, storiesTable } from "@workspace/db";
-import { eq, gt, desc, inArray } from "drizzle-orm";
+import { eq, gt, desc } from "drizzle-orm";
 import { requireSession } from "../lib/sessionAuth.js";
 
 const router: IRouter = Router();
@@ -39,8 +39,8 @@ async function getAuthorInfo(hash: string, mode: string) {
   };
 }
 
-/* ── GET /api/stories — все активные истории, сгруппированные по автору ── */
-router.get("/api/stories", async (_req, res) => {
+/* ── GET /stories — все активные истории, сгруппированные по автору ── */
+router.get("/stories", async (_req, res) => {
   try {
     const now = new Date();
     const rows = await db
@@ -88,8 +88,8 @@ router.get("/api/stories", async (_req, res) => {
   }
 });
 
-/* ── POST /api/stories — создать историю ── */
-router.post("/api/stories", requireSession, async (req, res) => {
+/* ── POST /stories — создать историю ── */
+router.post("/stories", requireSession, async (req, res) => {
   try {
     const userHash: string = (req as any).userHash;
     const { authorMode = "pro", mediaType, mediaUrl, textContent, bgGradient } = req.body as {
@@ -129,8 +129,8 @@ router.post("/api/stories", requireSession, async (req, res) => {
   }
 });
 
-/* ── DELETE /api/stories/:id — удалить свою историю ── */
-router.delete("/api/stories/:id", requireSession, async (req, res) => {
+/* ── DELETE /stories/:id — удалить свою историю ── */
+router.delete("/stories/:id", requireSession, async (req, res) => {
   try {
     const userHash: string = (req as any).userHash;
     const id = Number(req.params.id);
