@@ -426,14 +426,14 @@ function RoomInner({
         if (msg.type === 'meeting_ended') {
           sessionStorage.removeItem(`meetingToken_${meetingId}`);
           sessionStorage.removeItem(`meetingData_${meetingId}`);
-          sessionStorage.setItem('meetingEndedMsg', 'Совещание завершено ведущим');
+          sessionStorage.setItem('meetingEndedMsg', 'Конференция завершена ведущим');
           room?.disconnect();
           window.location.href = '/';
         }
         if (msg.type === 'participant_kicked' && msg.participantId === info.participantId) {
           sessionStorage.removeItem(`meetingToken_${meetingId}`);
           sessionStorage.removeItem(`meetingData_${meetingId}`);
-          sessionStorage.setItem('meetingEndedMsg', 'Вы были удалены из совещания');
+          sessionStorage.setItem('meetingEndedMsg', 'Вы были удалены из конференции');
           room?.disconnect();
           window.location.href = '/';
         }
@@ -1077,7 +1077,7 @@ function RoomInner({
                     { icon: '✅', title: 'Завершение вопроса', text: 'Участник сам нажимает «Завершить вопрос» или ты можешь отключить его из меню участника.' },
                     { icon: '🔕', title: 'Тишина в зале', text: 'Кнопка 🔕 отключает микрофоны всех участников одновременно.' },
                     { icon: '👤', title: 'Управление ролями', text: 'Долгое нажатие на участника → назначь со-ведущего, модератора или удали из комнаты.' },
-                    { icon: '⛔', title: 'Завершить совещание', text: 'Кнопка «Завершить» закрывает комнату для всех и уведомляет участников.' },
+                    { icon: '⛔', title: 'Завершить конференцию', text: 'Кнопка «Завершить» закрывает комнату для всех и уведомляет участников.' },
                   ].map(tip => (
                     <div key={tip.icon} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                       <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(99,102,241,0.12)',
@@ -1151,7 +1151,7 @@ function RoomInner({
                 border: '1px solid rgba(239,68,68,0.25)' }}>
               <div style={{ fontSize: 40, textAlign: 'center', marginBottom: 12 }}>⛔</div>
               <div style={{ fontSize: 18, fontWeight: 900, color: '#fff', textAlign: 'center', marginBottom: 8 }}>
-                Завершить совещание?
+                Завершить конференцию?
               </div>
               <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 1.6, marginBottom: 24 }}>
                 Все участники будут отключены и уведомлены.
@@ -1272,7 +1272,7 @@ export default function MeetingRoom() {
         <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
           style={{ width: 40, height: 40, borderRadius: '50%',
             border: '3px solid rgba(99,102,241,0.2)', borderTop: `3px solid ${ACCENT}` }} />
-        <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)' }}>Подключение к совещанию...</div>
+        <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)' }}>Подключение к конференции...</div>
       </div>
     );
   }
@@ -1284,7 +1284,7 @@ export default function MeetingRoom() {
         <div style={{ fontSize: 52 }}>🔒</div>
         <div style={{ fontSize: 20, fontWeight: 900, color: '#fff' }}>Нет доступа</div>
         <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', textAlign: 'center', maxWidth: 280 }}>
-          {errorMsg || 'Не удалось подтвердить участие в совещании'}
+          {errorMsg || 'Не удалось подтвердить участие в конференции'}
         </div>
         <motion.button whileTap={{ scale: 0.95 }}
           onClick={() => window.location.href = `/meet/${meetingId}`}

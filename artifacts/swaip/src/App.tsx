@@ -2961,7 +2961,7 @@ function ScreenMenuTab({ onNavigate, currentMode, accent = 'rgba(255,255,255,0.5
     { mode:'pro',      label:'Про',       icon:'💼' },
     { mode:'scene',    label:'Сцена',     icon:'🎤' },
     { mode:'circle',   label:'Круг',      icon:'👥' },
-    { mode:'meetings', label:'Совещания', icon:'📋' },
+    { mode:'meetings', label:'Конференции', icon:'📋' },
   ].filter(i => i.mode !== currentMode);
 
   if (!onNavigate) return null;
@@ -3081,7 +3081,7 @@ function ScreenMenuButton({ onNavigate, onBack, currentMode, accent, customizeAc
     { mode:'pro'      as const, label:'ПРО',        sub:'Профессиональная жизнь & портфолио', icon:'💼', color:'#60a5fa' },
     { mode:'scene'    as const, label:'СЦЕНА',      sub:'Творчество & публичность',            icon:'🎤', color:'#00e5ff' },
     { mode:'circle'   as const, label:'КРУГ',       sub:'Близкий круг & доверие',              icon:'👥', color:'#c9983a' },
-    { mode:'meetings' as const, label:'СОВЕЩАНИЯ',  sub:'Планёрки & собрания',                 icon:'📋', color:'#818cf8' },
+    { mode:'meetings' as const, label:'КОНФЕРЕНЦИИ', sub:'Презентации · Планёрки · Обсуждение',  icon:'📋', color:'#818cf8' },
   ].filter(s => s.mode !== currentMode);
 
   const handleNav = (mode: 'pro'|'scene'|'circle'|'compass'|'meetings') => {
@@ -24009,7 +24009,7 @@ function MeetingsScreen({ onBack, userHash }: { onBack: () => void; userHash: st
   };
 
   const handleDelete = async (meetingId: string) => {
-    if (!confirm('Удалить это совещание?')) return;
+    if (!confirm('Удалить эту конференцию?')) return;
     await fetch(`${API}/api/meetings/${meetingId}`, {
       method: 'DELETE', headers: { 'x-session-token': getST() || '' },
     });
@@ -24091,9 +24091,9 @@ function MeetingsScreen({ onBack, userHash }: { onBack: () => void; userHash: st
           ←
         </motion.button>
         <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ fontSize:17, fontWeight:900, color:'#fff', letterSpacing:'0.02em' }}>Переговорные</div>
+          <div style={{ fontSize:17, fontWeight:900, color:'#fff', letterSpacing:'0.02em' }}>Конференции</div>
           <div style={{ fontSize:11, color:'rgba(255,255,255,0.3)', marginTop:1 }}>
-            {meetings.length > 0 ? `${meetings.length} комнат${meetings.length === 1 ? 'а' : meetings.length < 5 ? 'ы' : ''}` : 'Офисный этаж'}
+            {meetings.length > 0 ? `${meetings.length} конференци${meetings.length === 1 ? 'я' : meetings.length < 5 ? 'и' : 'й'}` : 'Презентации · Планёрки · Обсуждение'}
           </div>
         </div>
         <motion.button whileTap={{ scale:0.93 }} onClick={() => setShowCreate(true)}
@@ -24316,7 +24316,7 @@ function MeetingsScreen({ onBack, userHash }: { onBack: () => void; userHash: st
                 <motion.button whileTap={{ scale:0.9 }} onClick={() => setShowCreate(false)}
                   style={{ width:36, height:36, borderRadius:'50%', background:'rgba(255,255,255,0.08)',
                     border:'none', color:'#fff', fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', marginRight:12 }}>←</motion.button>
-                <div style={{ fontSize:16, fontWeight:800, color:'#fff', flex:1 }}>Создать совещание</div>
+                <div style={{ fontSize:16, fontWeight:800, color:'#fff', flex:1 }}>Создать конференцию</div>
               </div>
 
               <div style={{ flex:1, overflowY:'auto', padding:'18px 16px', display:'flex', flexDirection:'column', gap:18 }}>
@@ -24456,7 +24456,7 @@ function MeetingsScreen({ onBack, userHash }: { onBack: () => void; userHash: st
                 padding:24, width:'100%', maxWidth:380, boxShadow:'0 20px 60px rgba(99,102,241,0.25)' }}>
               <div style={{ textAlign:'center', marginBottom:20 }}>
                 <div style={{ fontSize:48, marginBottom:10 }}>🎉</div>
-                <div style={{ fontSize:18, fontWeight:900, color:'#fff', marginBottom:4 }}>Совещание создано!</div>
+                <div style={{ fontSize:18, fontWeight:900, color:'#fff', marginBottom:4 }}>Конференция создана!</div>
                 <div style={{ fontSize:13, color:'rgba(255,255,255,0.45)' }}>Поделитесь ссылкой с участниками</div>
               </div>
 
@@ -24515,7 +24515,7 @@ function MeetingsScreen({ onBack, userHash }: { onBack: () => void; userHash: st
                   {copied ? '✅ Скопировано!' : '📋 Копировать'}
                 </motion.button>
                 <motion.button whileTap={{ scale:0.93 }}
-                  onClick={() => shareLink(result.inviteLink, `Совещание #${result.meetingId}`)}
+                  onClick={() => shareLink(result.inviteLink, `Конференция #${result.meetingId}`)}
                   style={{ flex:1, padding:'12px', background:`linear-gradient(135deg,${ACCENT},#818cf8)`,
                     border:'none', borderRadius:12, color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer' }}>
                   ↗ Поделиться
@@ -25278,9 +25278,9 @@ function CompassScreen({ onLogout, userHash, pendingChat, onPendingChatOpened }:
                       <span style={{ fontSize:20 }}>📋</span>
                       <div style={{ textAlign:'left' }}>
                         <span style={{ fontSize:14, fontWeight:800, fontFamily:'Montserrat,sans-serif',
-                          letterSpacing:'0.05em', color:'#c7d2fe' }}>Совещания</span>
+                          letterSpacing:'0.05em', color:'#c7d2fe' }}>Конференции</span>
                         <div style={{ fontSize:10, color:'rgba(165,180,252,0.55)', fontFamily:'Arial,sans-serif',
-                          marginTop:1 }}>Планёрки & собрания</div>
+                          marginTop:1 }}>Презентации · Планёрки · Обсуждение</div>
                       </div>
                     </div>
                     <span style={{ color:'rgba(255,255,255,0.45)', fontSize:16 }}>›</span>
