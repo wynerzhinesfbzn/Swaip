@@ -363,6 +363,7 @@ function RoomInner({
   const [handRaised, setHandRaised] = useState(false);
   const [hasFloor, setHasFloor] = useState(false);
   const [floorHolderId, setFloorHolderId] = useState<string | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
@@ -740,7 +741,7 @@ function RoomInner({
         </motion.button>
       )}
       {/* Выйти / Завершить */}
-      <div style={{ marginLeft: 8, display: 'flex', gap: 8 }}>
+      <div style={{ marginLeft: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
         {myRole === 'host' && (
           <motion.button whileTap={{ scale: 0.93 }} onClick={() => setShowEndConfirm(true)}
             style={{ background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)',
@@ -754,6 +755,14 @@ function RoomInner({
             borderRadius: 10, padding: '6px 10px', color: 'rgba(255,255,255,0.7)',
             fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Montserrat,sans-serif' }}>
           Выйти
+        </motion.button>
+        {/* Кнопка помощи */}
+        <motion.button whileTap={{ scale: 0.9 }} onClick={() => setShowHelp(true)}
+          style={{ width: 30, height: 30, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.15)',
+            background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.5)',
+            fontSize: 13, fontWeight: 900, cursor: 'pointer', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          ?
         </motion.button>
       </div>
     </div>
@@ -909,6 +918,13 @@ function RoomInner({
                 fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Montserrat,sans-serif' }}>
               Выйти
             </motion.button>
+            <motion.button whileTap={{ scale: 0.9 }} onClick={() => setShowHelp(true)}
+              style={{ width: 30, height: 30, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.15)',
+                background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.5)',
+                fontSize: 13, fontWeight: 900, cursor: 'pointer', display: 'flex',
+                alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              ?
+            </motion.button>
           </div>
 
           {/* Оверлей с участниками и чатом */}
@@ -1024,6 +1040,103 @@ function RoomInner({
           {controlsBar}
         </>
       )}
+
+      {/* ── Модалка-подсказка ── */}
+      <AnimatePresence>
+        {showHelp && (
+          <motion.div key="helpModal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
+              display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+              zIndex: 2100, padding: '0 0 80px' }}
+            onClick={() => setShowHelp(false)}>
+            <motion.div initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 60, opacity: 0 }} transition={{ type: 'spring', damping: 26 }}
+              onClick={e => e.stopPropagation()}
+              style={{ background: '#131320', borderRadius: 24, padding: '24px 22px 28px',
+                maxWidth: 380, width: '100%', border: '1px solid rgba(99,102,241,0.18)',
+                boxShadow: '0 -8px 40px rgba(0,0,0,0.5)' }}>
+              {/* Заголовок */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+                <div style={{ fontSize: 16, fontWeight: 900, color: '#fff', fontFamily: 'Montserrat,sans-serif' }}>
+                  {canAssignRoles ? '👑 Подсказки ведущего' : '👤 Подсказки участника'}
+                </div>
+                <motion.button whileTap={{ scale: 0.9 }} onClick={() => setShowHelp(false)}
+                  style={{ width: 28, height: 28, borderRadius: '50%', border: 'none',
+                    background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)',
+                    fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  ✕
+                </motion.button>
+              </div>
+
+              {canAssignRoles ? (
+                /* ── ПОДСКАЗКИ ДЛЯ ВЕДУЩЕГО ── */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {[
+                    { icon: '✋', title: 'Поднятая рука', text: 'Участник нажимает «Рука» чтобы задать вопрос. Они автоматически перемещаются в начало списка.' },
+                    { icon: '🎙', title: 'Дать слово', text: 'Удерживай нажатие на карточке участника → выбери «Дать слово». Его микрофон включится автоматически.' },
+                    { icon: '✅', title: 'Завершение вопроса', text: 'Участник сам нажимает «Завершить вопрос» или ты можешь отключить его из меню участника.' },
+                    { icon: '🔕', title: 'Тишина в зале', text: 'Кнопка 🔕 отключает микрофоны всех участников одновременно.' },
+                    { icon: '👤', title: 'Управление ролями', text: 'Долгое нажатие на участника → назначь со-ведущего, модератора или удали из комнаты.' },
+                    { icon: '⛔', title: 'Завершить совещание', text: 'Кнопка «Завершить» закрывает комнату для всех и уведомляет участников.' },
+                  ].map(tip => (
+                    <div key={tip.icon} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(99,102,241,0.12)',
+                        border: '1px solid rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
+                        {tip.icon}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', fontFamily: 'Montserrat,sans-serif', marginBottom: 2 }}>
+                          {tip.title}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, fontFamily: 'Montserrat,sans-serif' }}>
+                          {tip.text}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                /* ── ПОДСКАЗКИ ДЛЯ УЧАСТНИКА ── */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {[
+                    { icon: '🎤', title: 'Микрофон', text: 'Нажми кнопку 🎤 чтобы говорить. Браузер спросит разрешение при первом включении.' },
+                    { icon: '✋', title: 'Поднять руку', text: 'Нажми «Рука» чтобы сообщить ведущему, что хочешь задать вопрос. Твоя карточка переместится вверх списка.' },
+                    { icon: '🎙', title: 'Получить слово', text: 'Ведущий может дать тебе слово — твой микрофон включится автоматически и ты получишь уведомление.' },
+                    { icon: '✅', title: 'Завершить вопрос', text: 'Когда закончишь говорить — нажми «Завершить вопрос». Это отключит твой микрофон и опустит руку.' },
+                    { icon: '💬', title: 'Чат', text: 'Используй чат для текстовых сообщений или голосовых заметок — они доступны всем участникам.' },
+                    { icon: '🔇', title: 'Если отключили', text: 'Ведущий может отключить твой микрофон. Ты всегда можешь снова нажать 🎤 чтобы включить его.' },
+                  ].map(tip => (
+                    <div key={tip.icon} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(16,185,129,0.1)',
+                        border: '1px solid rgba(16,185,129,0.2)', display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
+                        {tip.icon}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', fontFamily: 'Montserrat,sans-serif', marginBottom: 2 }}>
+                          {tip.title}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, fontFamily: 'Montserrat,sans-serif' }}>
+                          {tip.text}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <motion.button whileTap={{ scale: 0.97 }} onClick={() => setShowHelp(false)}
+                style={{ width: '100%', marginTop: 20, padding: '12px 0', borderRadius: 14,
+                  border: 'none', background: 'linear-gradient(135deg,#6366f1,#818cf8)',
+                  color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer',
+                  fontFamily: 'Montserrat,sans-serif' }}>
+                Понятно
+              </motion.button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Модалка завершения совещания ── */}
       <AnimatePresence>
