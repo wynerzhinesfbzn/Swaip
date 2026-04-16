@@ -254,6 +254,7 @@ export default function MeetingWhiteboard({meetingId,participantToken,isHost,wsR
   /* history / drag */
   const histRef = useRef<SceneObj[][]>([]);
   const saveRef = useRef<ReturnType<typeof setTimeout>|null>(null);
+  const wsSyncRef = useRef<ReturnType<typeof setTimeout>|null>(null);
   const dragRef = useRef<{
     type: 'draw'|'move'|'handle';
     tool?: Tool;
@@ -307,9 +308,20 @@ export default function MeetingWhiteboard({meetingId,participantToken,isHost,wsR
   /* ── Whiteboard sync ──────────────────── */
   const scheduleSync = useCallback((objs: SceneObj[]) => {
     if (!isHost) return;
+    const snap: Snapshot = { v:2, objs };
+
+    /* ── Быстрая трансляция через WS (300ms debounce) ── */
+    if (wsSyncRef.current) clearTimeout(wsSyncRef.current);
+    wsSyncRef.current = setTimeout(() => {
+      const ws = wsRef.current;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'whiteboard_update', snapshot: snap }));
+      }
+    }, 300);
+
+    /* ── Медленное HTTP-сохранение (2s debounce) ── */
     if (saveRef.current) clearTimeout(saveRef.current);
     saveRef.current = setTimeout(async () => {
-      const snap: Snapshot = { v:2, objs };
       try {
         await fetch(`${API}/api/meetings/${meetingId}/whiteboard`, {
           method:'POST',
@@ -319,7 +331,7 @@ export default function MeetingWhiteboard({meetingId,participantToken,isHost,wsR
         });
       } catch {}
     }, SAVE_DEBOUNCE_MS);
-  }, [meetingId, participantToken, isHost]);
+  }, [meetingId, participantToken, isHost, wsRef]);
 
   const applySnapshot = useCallback((snap: unknown) => {
     try {
