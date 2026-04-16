@@ -21653,15 +21653,32 @@ function FlowScreen({ onBack, userHash, isActive }: { onBack: () => void; userHa
       try {
         let mediaUrl: string|undefined;
         if (file) {
-          const fd = new FormData();
-          fd.append('file', file);
-          const endpoint = mediaType === 'video' ? '/api/video-upload' : '/api/image-upload';
-          const up = await fetch(`${window.location.origin}${endpoint}`, {
-            method:'POST', headers:{'x-session-token': getST()}, body: fd
-          });
-          if (!up.ok) throw new Error('upload failed');
-          const { url } = await up.json();
-          mediaUrl = url;
+          if (mediaType === 'video') {
+            const up = await fetch(`${window.location.origin}/api/video-upload`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': file.type || 'video/webm',
+                'x-filename': file.name,
+                'x-session-token': getST(),
+              },
+              body: file,
+            });
+            if (!up.ok) throw new Error('video upload failed');
+            const { url } = await up.json();
+            mediaUrl = url;
+          } else {
+            const up = await fetch(`${window.location.origin}/api/image-upload`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': file.type || 'image/jpeg',
+                'x-session-token': getST(),
+              },
+              body: file,
+            });
+            if (!up.ok) throw new Error('image upload failed');
+            const { url } = await up.json();
+            mediaUrl = url;
+          }
         }
         const body: Record<string,string> = { mediaType };
         if (mediaUrl) body.mediaUrl = mediaUrl;
