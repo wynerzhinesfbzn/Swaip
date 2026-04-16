@@ -22094,6 +22094,12 @@ function FlowScreen({ onBack, userHash, isActive }: { onBack: () => void; userHa
                   }}>
                   {s.mediaType === 'video' && s.mediaUrl && (
                     <video key={s.mediaUrl} src={s.mediaUrl} autoPlay playsInline muted loop
+                      preload="auto"
+                      onLoadedMetadata={e => {
+                        const v = e.currentTarget;
+                        v.currentTime = 0.01;
+                        v.ontimeupdate = () => { v.currentTime = 0; v.play().catch(()=>{}); v.ontimeupdate = null; };
+                      }}
                       style={{ maxWidth:'100%', maxHeight:'100%', objectFit:'contain', pointerEvents:'none' }} />
                   )}
                   {s.mediaType === 'image' && s.mediaUrl && (
@@ -22226,7 +22232,13 @@ function FlowScreen({ onBack, userHash, isActive }: { onBack: () => void; userHa
                   ) : (
                     /* Просмотр записанного видео */
                     <>
-                      <video ref={camPreviewRef} src={camPreviewUrl} controls playsInline
+                      <video ref={camPreviewRef} src={camPreviewUrl ?? undefined}
+                        controls autoPlay playsInline preload="auto"
+                        onLoadedMetadata={e => {
+                          const v = e.currentTarget;
+                          v.currentTime = 0.01;
+                          v.ontimeupdate = () => { v.currentTime = 0; v.ontimeupdate = null; };
+                        }}
                         style={{ width:'100%', flex:1, objectFit:'contain', background:'#000' }} />
                       <div style={{ display:'flex', gap:12, padding:'12px 16px 24px' }}>
                         <motion.button whileTap={{ scale:0.94 }} onClick={resetCamRecording}
