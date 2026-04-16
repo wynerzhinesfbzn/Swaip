@@ -186,11 +186,23 @@ export default function MeetingWhiteboard({meetingId,participantToken,isHost,wsR
   const contRef    = useRef<HTMLDivElement>(null);
   const objsRef    = useRef<SceneObj[]>([]);
 
-  const [tool,   setTool]   = useState<Tool>('pencil');
-  const [color,  setColor]  = useState('#111827');
-  const [lw,     setLw]     = useState(3);
-  const [selId,  setSelId]  = useState<string|null>(null);
-  const [, forceRender]     = useState(0);
+  /* read-through refs so handlers always see latest values without recreating */
+  const toolRef  = useRef<Tool>('pencil');
+  const colorRef = useRef('#111827');
+  const lwRef    = useRef(3);
+  const selIdRef = useRef<string|null>(null);
+
+  const [tool,   setToolState]  = useState<Tool>('pencil');
+  const [color,  setColorState] = useState('#111827');
+  const [lw,     setLwState]    = useState(3);
+  const [selId,  setSelIdState] = useState<string|null>(null);
+  const [, forceRender]         = useState(0);
+
+  /* sync state → ref */
+  const setTool = (t: Tool)  => { toolRef.current=t;  setToolState(t); };
+  const setColor = (c: string) => { colorRef.current=c; setColorState(c); };
+  const setLw = (w: number)   => { lwRef.current=w;   setLwState(w); };
+  const setSelId = (id: string|null) => { selIdRef.current=id; setSelIdState(id); };
 
   /* text editing overlay */
   const [textEdit, setTextEdit] = useState<{id:string;x:number;y:number;size:number;color:string;initText:string}|null>(null);
@@ -212,8 +224,7 @@ export default function MeetingWhiteboard({meetingId,participantToken,isHost,wsR
   }|null>(null);
 
   /* ── Canvas helpers ──────────────────────── */
-  const getCtx = () => mainRef.current?.getContext('2d') ?? null;
-  const getOCtx = () => overlayRef.current?.getContext('2d') ?? null;
+  const getCtx  = () => mainRef.current?.getContext('2d') ?? null;
 
   const redrawMain = useCallback((objs: SceneObj[]) => {
     const ctx = getCtx(); if (!ctx) return;
@@ -314,93 +325,85 @@ export default function MeetingWhiteboard({meetingId,participantToken,isHost,wsR
       const c=mainRef.current; const o=overlayRef.current; const cont=contRef.current;
       if(!c||!o||!cont) return;
       const {width:w,height:h}=cont.getBoundingClientRect();
-      if(c.width!==w||c.height!==h){
-        c.width=w; c.height=h; o.width=w; o.height=h;
+      const rw=Math.round(w), rh=Math.round(h);
+      if(c.width!==rw||c.height!==rh){
+        c.width=rw; c.height=rh; o.width=rw; o.height=rh;
         redrawMain(objsRef.current);
-        drawSelectionBox(objsRef.current,selId);
+        drawSelectionBox(objsRef.current,selIdRef.current);
       }
     });
     if(contRef.current) obs.observe(contRef.current);
     return ()=>obs.disconnect();
-  },[redrawMain,drawSelectionBox,selId]);
+  },[redrawMain,drawSelectionBox]);
 
   /* focus textarea when text edit starts */
   useEffect(()=>{ if(textEdit) setTimeout(()=>textareaRef.current?.focus(),30); },[textEdit]);
 
-  /* ── Mouse helpers ─────────────────────── */
-  const getXY = (e:React.MouseEvent):[number,number] => {
-    const r=mainRef.current!.getBoundingClientRect();
-    return [e.clientX-r.left, e.clientY-r.top];
+  /* ── Canvas coordinate helpers ─────────── */
+  const toCanvasXY = (clientX: number, clientY: number): [number,number] => {
+    const r = mainRef.current!.getBoundingClientRect();
+    return [clientX - r.left, clientY - r.top];
   };
 
-  const getCursor = (): string => {
-    if (!isHost) return 'default';
-    if (tool==='text') return 'text';
-    if (tool==='eraser') return 'cell';
-    if (tool==='select') return 'default';
-    return 'crosshair';
-  };
-
-  const commitObj = (o:SceneObj) => {
+  const commitObj = useCallback((o:SceneObj) => {
     histRef.current=[...histRef.current, objsRef.current];
     const next=[...objsRef.current, o];
     objsRef.current=next;
     redrawMain(next);
     setSelId(null); clearOverlay();
     scheduleSync(next);
-  };
+  }, [redrawMain, clearOverlay, scheduleSync]);
 
-  const updateObj = (id:string, patch:Partial<SceneObj>) => {
+  const updateObj = useCallback((id:string, patch:Partial<SceneObj>) => {
     const next=objsRef.current.map(o=>o.id===id?{...o,...patch} as SceneObj:o);
     objsRef.current=next;
     redrawMain(next);
     scheduleSync(next);
-  };
+  }, [redrawMain, scheduleSync]);
 
-  /* ── Pointer events ────────────────────── */
-  const onMouseDown = (e:React.MouseEvent) => {
-    if(!isHost) return;
-    const [mx,my]=getXY(e);
+  /* ── Core pointer logic (shared by mouse & touch) ─── */
+  const handleDown = useCallback((mx: number, my: number) => {
+    if (!isHost) return;
+    const t = toolRef.current;
+    const c = colorRef.current;
+    const w = lwRef.current;
 
-    if(tool==='text') {
-      /* if clicking on an existing text object → select it */
-      const ctx=getCtx();
-      const hit=[...objsRef.current].reverse().find(o=>ctx&&hitTest(o,mx,my,ctx)&&o.kind==='text');
-      if(hit && hit.kind==='text') {
+    if (t === 'text') {
+      const ctx = getCtx();
+      const hit = [...objsRef.current].reverse().find(o => ctx && hitTest(o,mx,my,ctx) && o.kind==='text');
+      if (hit && hit.kind==='text') {
         setSelId(hit.id);
         setTool('select');
         drawSelectionBox(objsRef.current, hit.id);
         return;
       }
-      /* start inline text input */
-      const newId=uid();
-      setTextEdit({id:newId, x:mx, y:my+lw*5, size:Math.max(14,lw*5), color, initText:''});
+      const newId = uid();
+      setTextEdit({id:newId, x:mx, y:my+w*5, size:Math.max(14,w*5), color:c, initText:''});
       return;
     }
 
-    if(tool==='select') {
-      const ctx=getCtx();
-      /* check handle first */
-      if(selId) {
-        const selObj=objsRef.current.find(o=>o.id===selId);
-        if(selObj&&ctx) {
-          const bb=getBB(selObj,ctx);
-          const pad=6;
-          const pbb={x:bb.x-pad,y:bb.y-pad,w:bb.w+pad*2,h:bb.h+pad*2};
-          const hi=handleAt(pbb,mx,my);
-          if(hi>=0){
-            dragRef.current={type:'handle',startX:mx,startY:my,curX:mx,curY:my,id:selId,hi,origObj:selObj};
+    if (t === 'select') {
+      const ctx = getCtx();
+      const sid = selIdRef.current;
+      if (sid) {
+        const selObj = objsRef.current.find(o=>o.id===sid);
+        if (selObj && ctx) {
+          const bb = getBB(selObj, ctx);
+          const pad = 6;
+          const pbb = {x:bb.x-pad,y:bb.y-pad,w:bb.w+pad*2,h:bb.h+pad*2};
+          const hi = handleAt(pbb, mx, my);
+          if (hi >= 0) {
+            dragRef.current = {type:'handle',startX:mx,startY:my,curX:mx,curY:my,id:sid,hi,origObj:selObj};
             return;
           }
         }
       }
-      /* hit test objects (top→bottom) */
-      const ctx2=getCtx();
-      const hit=[...objsRef.current].reverse().find(o=>ctx2&&hitTest(o,mx,my,ctx2));
-      if(hit){
+      const ctx2 = getCtx();
+      const hit = [...objsRef.current].reverse().find(o=>ctx2&&hitTest(o,mx,my,ctx2));
+      if (hit) {
         setSelId(hit.id);
-        drawSelectionBox(objsRef.current,hit.id);
-        dragRef.current={type:'move',startX:mx,startY:my,curX:mx,curY:my,id:hit.id,origObj:hit};
+        drawSelectionBox(objsRef.current, hit.id);
+        dragRef.current = {type:'move',startX:mx,startY:my,curX:mx,curY:my,id:hit.id,origObj:hit};
       } else {
         setSelId(null);
         clearOverlay();
@@ -409,19 +412,19 @@ export default function MeetingWhiteboard({meetingId,participantToken,isHost,wsR
     }
 
     /* drawing tools */
-    dragRef.current={type:'draw',tool,startX:mx,startY:my,curX:mx,curY:my,pts:[[mx,my]]};
-  };
+    dragRef.current = {type:'draw',tool:t,startX:mx,startY:my,curX:mx,curY:my,pts:[[mx,my]]};
+  }, [isHost, drawSelectionBox, clearOverlay]);
 
-  const onMouseMove = (e:React.MouseEvent) => {
-    if(!isHost) return;
-    const [mx,my]=getXY(e);
-    const d=dragRef.current; if(!d) return;
-    d.curX=mx; d.curY=my;
+  const handleMove = useCallback((mx: number, my: number) => {
+    if (!isHost) return;
+    const d = dragRef.current; if (!d) return;
+    const c = colorRef.current;
+    const w = lwRef.current;
 
-    if(d.type==='move'&&d.id) {
+    if (d.type==='move' && d.id) {
       const dx=mx-d.startX, dy=my-d.startY;
       const orig=d.origObj!;
-      let patched:SceneObj;
+      let patched: SceneObj;
       switch(orig.kind) {
         case 'stroke': patched={...orig,pts:orig.pts.map(([x,y])=>[x+dx,y+dy] as [number,number])}; break;
         case 'line':   patched={...orig,x1:orig.x1+dx,y1:orig.y1+dy,x2:orig.x2+dx,y2:orig.y2+dy}; break;
@@ -432,45 +435,45 @@ export default function MeetingWhiteboard({meetingId,participantToken,isHost,wsR
       const next=objsRef.current.map(o=>o.id===d.id?patched:o);
       objsRef.current=next;
       redrawMain(next);
-      drawSelectionBox(next,d.id);
+      drawSelectionBox(next, d.id);
       return;
     }
 
-    if(d.type==='handle'&&d.id!=null&&d.hi!=null) {
+    if (d.type==='handle' && d.id!=null && d.hi!=null) {
       const dx=mx-d.curX, dy=my-d.curY;
       d.curX=mx; d.curY=my;
       const orig=objsRef.current.find(o=>o.id===d.id)!;
-      const patched=applyResize(orig,d.hi,dx,dy);
+      const patched=applyResize(orig, d.hi, dx, dy);
       const next=objsRef.current.map(o=>o.id===d.id?patched:o);
       objsRef.current=next;
       redrawMain(next);
-      drawSelectionBox(next,d.id);
+      drawSelectionBox(next, d.id);
       return;
     }
 
-    if(d.type==='draw') {
+    if (d.type==='draw') {
       const {tool:t,startX:sx,startY:sy}=d;
       const oc=overlayRef.current; if(!oc) return;
       const ctx=oc.getContext('2d')!;
       ctx.clearRect(0,0,oc.width,oc.height);
 
-      if(t==='pencil'||t==='eraser') {
+      if (t==='pencil'||t==='eraser') {
         d.pts!.push([mx,my]);
         ctx.save();
-        ctx.strokeStyle=t==='eraser'?'#ffffff':color;
-        ctx.lineWidth=t==='eraser'?lw*4:lw;
+        ctx.strokeStyle=t==='eraser'?'#ffffff':c;
+        ctx.lineWidth=t==='eraser'?w*4:w;
         ctx.lineCap='round'; ctx.lineJoin='round';
         ctx.beginPath(); ctx.moveTo(d.pts![0][0],d.pts![0][1]);
         for(let i=1;i<d.pts!.length;i++) ctx.lineTo(d.pts![i][0],d.pts![i][1]);
         ctx.stroke(); ctx.restore();
       } else {
         ctx.save();
-        ctx.strokeStyle=color; ctx.lineWidth=lw; ctx.lineCap='round'; ctx.lineJoin='round';
-        if(t==='line') {
+        ctx.strokeStyle=c; ctx.lineWidth=w; ctx.lineCap='round'; ctx.lineJoin='round';
+        if (t==='line') {
           ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(mx,my); ctx.stroke();
-        } else if(t==='rect') {
+        } else if (t==='rect') {
           ctx.strokeRect(sx,sy,mx-sx,my-sy);
-        } else if(t==='ellipse') {
+        } else if (t==='ellipse') {
           const rxt=Math.abs((mx-sx)/2), ryt=Math.abs((my-sy)/2);
           ctx.beginPath();
           ctx.ellipse(sx+(mx-sx)/2,sy+(my-sy)/2,Math.max(1,rxt),Math.max(1,ryt),0,0,Math.PI*2);
@@ -479,54 +482,101 @@ export default function MeetingWhiteboard({meetingId,participantToken,isHost,wsR
         ctx.restore();
       }
     }
-  };
+  }, [isHost, redrawMain, drawSelectionBox]);
 
-  const onMouseUp = (e:React.MouseEvent) => {
-    if(!isHost) return;
-    const [mx,my]=getXY(e);
-    const d=dragRef.current; if(!d) return;
+  const handleUp = useCallback((mx: number, my: number) => {
+    if (!isHost) return;
+    const d = dragRef.current; if (!d) return;
+    const c = colorRef.current;
+    const w = lwRef.current;
 
-    if(d.type==='move'&&d.id) {
+    if (d.type==='move' && d.id) {
       dragRef.current=null;
       histRef.current=[...histRef.current, d.origObj ? objsRef.current.map(o=>o.id===d.id?d.origObj!:o) : objsRef.current];
       scheduleSync(objsRef.current);
       return;
     }
-    if(d.type==='handle') {
+    if (d.type==='handle') {
       dragRef.current=null;
       scheduleSync(objsRef.current);
       return;
     }
-    if(d.type==='draw') {
+    if (d.type==='draw') {
       clearOverlay();
       const {tool:t,startX:sx,startY:sy}=d;
-      let o:SceneObj|null=null;
-      if(t==='pencil') { if(d.pts!.length>=2) o={id:uid(),kind:'stroke',pts:d.pts!,color,lw}; }
-      else if(t==='eraser') { if(d.pts!.length>=2) o={id:uid(),kind:'stroke',pts:d.pts!,color:'#ffffff',lw:lw*4}; }
-      else if(t==='line') {
-        if(Math.hypot(mx-sx,my-sy)>3) o={id:uid(),kind:'line',x1:sx,y1:sy,x2:mx,y2:my,color,lw};
-      } else if(t==='rect') {
-        if(Math.abs(mx-sx)>3&&Math.abs(my-sy)>3) o={id:uid(),kind:'rect',x:sx,y:sy,w:mx-sx,h:my-sy,color,lw};
-      } else if(t==='ellipse') {
-        if(Math.abs(mx-sx)>3&&Math.abs(my-sy)>3) o={id:uid(),kind:'ell',cx:sx+(mx-sx)/2,cy:sy+(my-sy)/2,rx:(mx-sx)/2,ry:(my-sy)/2,color,lw};
+      let o: SceneObj|null=null;
+      if (t==='pencil') {
+        /* ensure final point is included */
+        const pts = d.pts!;
+        if (!pts.some(([x,y])=>x===mx&&y===my)) pts.push([mx,my]);
+        if (pts.length>=2) o={id:uid(),kind:'stroke',pts,color:c,lw:w};
+      } else if (t==='eraser') {
+        const pts = d.pts!;
+        if (!pts.some(([x,y])=>x===mx&&y===my)) pts.push([mx,my]);
+        if (pts.length>=2) o={id:uid(),kind:'stroke',pts,color:'#ffffff',lw:w*4};
+      } else if (t==='line') {
+        if (Math.hypot(mx-sx,my-sy)>3) o={id:uid(),kind:'line',x1:sx,y1:sy,x2:mx,y2:my,color:c,lw:w};
+      } else if (t==='rect') {
+        if (Math.abs(mx-sx)>3&&Math.abs(my-sy)>3) o={id:uid(),kind:'rect',x:sx,y:sy,w:mx-sx,h:my-sy,color:c,lw:w};
+      } else if (t==='ellipse') {
+        if (Math.abs(mx-sx)>3&&Math.abs(my-sy)>3) o={id:uid(),kind:'ell',cx:sx+(mx-sx)/2,cy:sy+(my-sy)/2,rx:(mx-sx)/2,ry:(my-sy)/2,color:c,lw:w};
       }
-      if(o) commitObj(o);
+      if (o) commitObj(o);
     }
     dragRef.current=null;
+  }, [isHost, clearOverlay, commitObj, scheduleSync]);
+
+  /* ── Mouse events ────────────────────── */
+  const onMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const [mx,my] = toCanvasXY(e.clientX, e.clientY);
+    handleDown(mx, my);
+  };
+  const onMouseMove = (e: React.MouseEvent) => {
+    const [mx,my] = toCanvasXY(e.clientX, e.clientY);
+    handleMove(mx, my);
+    /* cursor update for resize handles */
+    if (isHost && toolRef.current==='select' && selIdRef.current) {
+      const ctx=getCtx();
+      const selObj=objsRef.current.find(o=>o.id===selIdRef.current);
+      if (selObj&&ctx) {
+        const bb=getBB(selObj,ctx);
+        const pad=6;
+        const pbb={x:bb.x-pad,y:bb.y-pad,w:bb.w+pad*2,h:bb.h+pad*2};
+        const hi=handleAt(pbb,mx,my);
+        if (mainRef.current) mainRef.current.style.cursor = hi>=0 ? CURSORS[hi] : 'default';
+      }
+    }
+  };
+  const onMouseUp = (e: React.MouseEvent) => {
+    const [mx,my] = toCanvasXY(e.clientX, e.clientY);
+    handleUp(mx, my);
+  };
+  const onMouseLeave = (e: React.MouseEvent) => {
+    if (dragRef.current?.type==='draw') {
+      const [mx,my] = toCanvasXY(e.clientX, e.clientY);
+      handleUp(mx, my);
+    }
   };
 
-  /* cursor on overlay when hovering handles */
-  const onMouseMoveForCursor = (e:React.MouseEvent) => {
-    if(!isHost||tool!=='select'||!selId) return;
-    const [mx,my]=getXY(e);
-    const ctx=getCtx();
-    const selObj=objsRef.current.find(o=>o.id===selId);
-    if(!selObj||!ctx) return;
-    const bb=getBB(selObj,ctx);
-    const pad=6;
-    const pbb={x:bb.x-pad,y:bb.y-pad,w:bb.w+pad*2,h:bb.h+pad*2};
-    const hi=handleAt(pbb,mx,my);
-    if(mainRef.current) mainRef.current.style.cursor = hi>=0 ? CURSORS[hi] : 'default';
+  /* ── Touch events ────────────────────── */
+  const onTouchStart = (e: React.TouchEvent) => {
+    e.preventDefault();
+    const t = e.touches[0]; if (!t) return;
+    const [mx,my] = toCanvasXY(t.clientX, t.clientY);
+    handleDown(mx, my);
+  };
+  const onTouchMove = (e: React.TouchEvent) => {
+    e.preventDefault();
+    const t = e.touches[0]; if (!t) return;
+    const [mx,my] = toCanvasXY(t.clientX, t.clientY);
+    handleMove(mx, my);
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    e.preventDefault();
+    const t = e.changedTouches[0]; if (!t) return;
+    const [mx,my] = toCanvasXY(t.clientX, t.clientY);
+    handleUp(mx, my);
   };
 
   /* ── Text commit ────────────────────────── */
@@ -541,7 +591,7 @@ export default function MeetingWhiteboard({meetingId,participantToken,isHost,wsR
     } else {
       commitObj({id:te.id,kind:'text',x:te.x,y:te.y,text:trimmed,color:te.color,size:te.size});
     }
-  }, []);
+  }, [updateObj, commitObj]);
 
   /* ── Keyboard ───────────────────────────── */
   useEffect(()=>{
@@ -549,9 +599,10 @@ export default function MeetingWhiteboard({meetingId,participantToken,isHost,wsR
       if(!isHost) return;
       if(textEdit) return;
       if(e.key==='Delete'||e.key==='Backspace') {
-        if(selId&&document.activeElement===document.body){
+        const sid=selIdRef.current;
+        if(sid&&document.activeElement===document.body){
           histRef.current=[...histRef.current,objsRef.current];
-          const next=objsRef.current.filter(o=>o.id!==selId);
+          const next=objsRef.current.filter(o=>o.id!==sid);
           objsRef.current=next; setSelId(null); clearOverlay(); redrawMain(next); scheduleSync(next);
         }
       }
@@ -560,13 +611,13 @@ export default function MeetingWhiteboard({meetingId,participantToken,isHost,wsR
           const prev=histRef.current[histRef.current.length-1];
           histRef.current=histRef.current.slice(0,-1);
           objsRef.current=prev; redrawMain(prev);
-          drawSelectionBox(prev,selId); scheduleSync(prev);
+          drawSelectionBox(prev,selIdRef.current); scheduleSync(prev);
         }
       }
     };
     window.addEventListener('keydown',h);
     return ()=>window.removeEventListener('keydown',h);
-  },[isHost,selId,textEdit,clearOverlay,redrawMain,drawSelectionBox,scheduleSync]);
+  },[isHost,textEdit,clearOverlay,redrawMain,drawSelectionBox,scheduleSync]);
 
   /* ── Undo / Clear ───────────────────────── */
   const undo=()=>{
@@ -580,24 +631,20 @@ export default function MeetingWhiteboard({meetingId,participantToken,isHost,wsR
     objsRef.current=[]; setSelId(null); clearOverlay(); redrawMain([]); scheduleSync([]);
   };
 
-  /* ── Snap & delete selected ─────────────── */
   const deleteSelected=()=>{
-    if(!selId) return;
+    const sid=selIdRef.current; if(!sid) return;
     histRef.current=[...histRef.current,objsRef.current];
-    const next=objsRef.current.filter(o=>o.id!==selId);
+    const next=objsRef.current.filter(o=>o.id!==sid);
     objsRef.current=next; setSelId(null); clearOverlay(); redrawMain(next); scheduleSync(next);
   };
 
   /* ── Text area position ─────────────────── */
   const textAreaStyle = useMemo(():React.CSSProperties => {
     if(!textEdit) return {display:'none'};
-    const canvasRect=mainRef.current?.getBoundingClientRect();
-    const contRect=contRef.current?.getBoundingClientRect();
-    if(!canvasRect||!contRect) return {display:'none'};
     return {
       position:'absolute',
-      left: textEdit.x - (canvasRect.left - contRect.left),
-      top:  textEdit.y - textEdit.size - (canvasRect.top - contRect.top),
+      left: textEdit.x,
+      top:  textEdit.y - textEdit.size,
       minWidth:120, maxWidth:400,
       font:`${textEdit.size}px Montserrat, Arial, sans-serif`,
       color: textEdit.color,
@@ -612,6 +659,14 @@ export default function MeetingWhiteboard({meetingId,participantToken,isHost,wsR
       zIndex:20,
     };
   },[textEdit]);
+
+  const getCursor = (): string => {
+    if (!isHost) return 'default';
+    if (tool==='text') return 'text';
+    if (tool==='eraser') return 'cell';
+    if (tool==='select') return 'default';
+    return 'crosshair';
+  };
 
   return (
     <div style={{width:'100%',height:'100%',display:'flex',flexDirection:'column',background:'#f3f4f6',userSelect:'none'}}>
@@ -632,7 +687,7 @@ export default function MeetingWhiteboard({meetingId,participantToken,isHost,wsR
               color:tool===t.id?'#fff':'#374151',
               transition:'background 0.15s', minWidth:50,
             }}>
-              <span style={{fontStyle:t.id==='text'?'normal':'normal',fontWeight:t.id==='text'?700:'normal'}}>{t.icon}</span>
+              <span style={{fontWeight:t.id==='text'?700:'normal'}}>{t.icon}</span>
               <span style={{fontSize:9,fontFamily:'Montserrat,sans-serif',fontWeight:600,letterSpacing:0.2}}>{t.label}</span>
             </button>
           ))}
@@ -707,15 +762,19 @@ export default function MeetingWhiteboard({meetingId,participantToken,isHost,wsR
 
       {/* ── Canvas area ── */}
       <div ref={contRef} style={{flex:1,position:'relative',overflow:'hidden'}}>
-        <canvas ref={mainRef} style={{
-          position:'absolute',inset:0,background:'#ffffff',
-          cursor:isHost?getCursor():'default',
-          touchAction:'none',
-        }}
+        <canvas ref={mainRef}
+          style={{
+            position:'absolute',inset:0,background:'#ffffff',
+            cursor:isHost?getCursor():'default',
+            touchAction:'none',
+          }}
           onMouseDown={onMouseDown}
-          onMouseMove={(e)=>{onMouseMove(e);onMouseMoveForCursor(e);}}
+          onMouseMove={onMouseMove}
           onMouseUp={onMouseUp}
-          onMouseLeave={(e)=>{ if(dragRef.current?.type==='draw') onMouseUp(e); }}
+          onMouseLeave={onMouseLeave}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
         />
         <canvas ref={overlayRef} style={{position:'absolute',inset:0,pointerEvents:'none'}}/>
 
