@@ -1138,7 +1138,7 @@ function RoomInner({
         )}
       </AnimatePresence>
 
-      {/* ── Модалка завершения совещания ── */}
+      {/* ── Модалка завершения конференции ── */}
       <AnimatePresence>
         {showEndConfirm && (
           <motion.div key="endModal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}

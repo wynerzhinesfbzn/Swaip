@@ -23940,7 +23940,7 @@ function useUnreadConversations(myHash: string) {
 }
 
 /* ─────────────────────────────────────────────────
-   MEETINGS SCREEN — совещания, планёрки, собрания
+   MEETINGS SCREEN — конференции, планёрки, презентации
 ───────────────────────────────────────────────── */
 function MeetingsScreen({ onBack, userHash }: { onBack: () => void; userHash: string }) {
   type Meeting = {
@@ -24300,7 +24300,7 @@ function MeetingsScreen({ onBack, userHash }: { onBack: () => void; userHash: st
         <div style={{ height:32 }} />
       </div>
 
-      {/* Модал создания совещания */}
+      {/* Модал создания конференции */}
       <AnimatePresence>
         {showCreate && (
           <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
@@ -25266,7 +25266,7 @@ function CompassScreen({ onLogout, userHash, pendingChat, onPendingChatOpened }:
                     )}
                   </div>
 
-                  {/* ── Совещания ── */}
+                  {/* ── Конференции ── */}
                   <motion.button whileTap={{ scale:0.97 }}
                     onClick={() => { setShowSidePanel(false); setTimeout(() => setCurrentMode('meetings'), 180); }}
                     style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
@@ -26086,7 +26086,7 @@ function CompassScreen({ onLogout, userHash, pendingChat, onPendingChatOpened }:
         </div>
       )}
 
-      {/* СОВЕЩАНИЯ */}
+      {/* КОНФЕРЕНЦИИ */}
       {currentMode === 'meetings' && (
         <div style={{ position:'absolute', inset:0, zIndex:50 }}>
           <MeetingsScreen onBack={() => setCurrentMode('compass')} userHash={userHash} />

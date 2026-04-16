@@ -34,7 +34,7 @@ function RulesModal({ onAccept }: { onAccept: () => void }) {
           padding: 28, width: '100%', maxWidth: 380, boxShadow: '0 20px 60px rgba(99,102,241,0.2)' }}>
         <div style={{ fontSize: 32, textAlign: 'center', marginBottom: 12 }}>📋</div>
         <div style={{ fontSize: 20, fontWeight: 900, color: '#fff', marginBottom: 18,
-          textAlign: 'center', fontFamily: 'Montserrat,sans-serif' }}>Правила совещания</div>
+          textAlign: 'center', fontFamily: 'Montserrat,sans-serif' }}>Правила конференции</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
           {[
             ['🖐️', 'Не перебивайте, поднимайте руку'],
@@ -228,7 +228,7 @@ export default function MeetingJoin() {
           borderRadius: 24, padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
           <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', marginBottom: 4, textAlign: 'center' }}>
-            Вход в совещание
+            Вход в конференцию
           </div>
 
           {/* Анонимный гость по URL-токену — специальный экран */}
@@ -388,14 +388,14 @@ export default function MeetingJoin() {
               fontSize: 16, fontWeight: 800, cursor: canSubmit ? 'pointer' : 'default',
               fontFamily: 'Montserrat,sans-serif', letterSpacing: '0.03em',
               transition: 'background .2s' }}>
-            {submitting ? '⏳ Входим...' : isAnonByUrl ? '🎭 Войти анонимно' : effectiveIsAnon ? '👤 Войти анонимно' : '🚀 Войти в совещание'}
+            {submitting ? '⏳ Входим...' : isAnonByUrl ? '🎭 Войти анонимно' : effectiveIsAnon ? '👤 Войти анонимно' : '🚀 Войти в конференцию'}
           </motion.button>
 
         </div>
 
         <div style={{ textAlign: 'center', marginTop: 16, fontSize: 11,
           color: 'rgba(255,255,255,0.2)', fontFamily: 'Arial,sans-serif' }}>
-          SWAIP · Совещания
+          SWAIP · Конференции
         </div>
       </motion.div>
     </div>

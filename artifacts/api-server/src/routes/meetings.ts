@@ -95,7 +95,7 @@ router.post("/meetings/create", requireSession, async (req, res) => {
   const creatorHash: string = (req as any).userHash;
   const { name, startTime, tokenType = "common", codeWord, tokenExpiry, allowAnonymous, anonymousGuest } = req.body;
   if (!name || typeof name !== "string" || !name.trim())
-    return res.status(400).json({ error: "Название совещания обязательно" });
+    return res.status(400).json({ error: "Название конференции обязательно" });
 
   const meetingId = genMeetingId();
   const commonToken = tokenType === "common" ? genToken() : null;
@@ -215,7 +215,7 @@ router.post("/meetings/validate", async (req, res) => {
   const nowSec = Math.floor(Date.now() / 1000);
 
   if (m.startTime && nowSec < m.startTime)
-    return res.status(403).json({ error: "Совещание ещё не началось", startTime: m.startTime });
+    return res.status(403).json({ error: "Конференция ещё не началась", startTime: m.startTime });
 
   if (m.tokenExpiry && nowSec > m.tokenExpiry)
     return res.status(403).json({ error: "Срок действия ссылки истёк" });
@@ -371,7 +371,7 @@ router.post("/meetings/token", async (req, res) => {
     return res.status(401).json({ error: "Участник не найден" });
 
   const mRows = await db.select().from(meetingsTable).where(eq(meetingsTable.meetingId, meetingId)).limit(1);
-  if (!mRows.length) return res.status(404).json({ error: "Совещание не найдено" });
+  if (!mRows.length) return res.status(404).json({ error: "Конференция не найдена" });
 
   const apiKey = process.env.LIVEKIT_API_KEY;
   const apiSecret = process.env.LIVEKIT_API_SECRET;
@@ -415,7 +415,7 @@ router.post("/meetings/token", async (req, res) => {
 
 /* ──────────────────────────────────────────────────
  * POST /api/meetings/:meetingId/end
- * Завершить совещание (только создатель)
+ * Завершить конференцию (только создатель)
  * ────────────────────────────────────────────────── */
 router.post("/meetings/:meetingId/end", requireSession, async (req, res) => {
   const creatorHash: string = (req as any).userHash;
