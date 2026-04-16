@@ -16622,11 +16622,13 @@ function ProScreen({ onBack, userHash, onInvite, isActive, registerCoverTrigger,
                     if (!hlNewTitle.trim()) return;
                     if (hlEditingId) {
                       setProHighlights(prev => prev.map(h => h.id===hlEditingId ? { ...h, title:hlNewTitle.trim(), emoji:hlNewEmoji, coverUrl:hlNewCoverUrl } : h));
+                      setShowHlEditor(false); setHlEditingId(null);
                     } else {
-                      const newHl: HlItem = { id: Date.now().toString(), title:hlNewTitle.trim(), emoji:hlNewEmoji, coverUrl:hlNewCoverUrl, mediaItems:[] };
+                      const newId = Date.now().toString();
+                      const newHl: HlItem = { id: newId, title:hlNewTitle.trim(), emoji:hlNewEmoji, coverUrl:hlNewCoverUrl, mediaItems:[] };
                       setProHighlights(prev => [...prev, newHl]);
+                      setHlEditingId(newId);
                     }
-                    setShowHlEditor(false); setHlEditingId(null);
                   }}
                   style={{ background:`linear-gradient(135deg,${activeTheme.accent},${activeTheme.accent2})`, border:'none', borderRadius:14, padding:'14px 24px', color:'#fff', fontSize:15, fontWeight:800, cursor:'pointer' }}>
                   {hlEditingId ? '✓ Сохранить' : '+ Создать хайлайт'}
@@ -16672,11 +16674,11 @@ function ProScreen({ onBack, userHash, onInvite, isActive, registerCoverTrigger,
                           const isImg=f.type.startsWith('image/');
                           let url='';
                           if(isImg){
-                            const r=await fetch(`${window.location.origin}/api/image-upload`,{method:'POST',headers:{'Content-Type':f.type},body:f});
+                            const r=await fetch(`${window.location.origin}/api/image-upload`,{method:'POST',headers:{'Content-Type':f.type,'x-session-token':getST()},body:f});
                             if(r.ok){const d=await r.json();url=d.url;}
                           } else {
                             const fd=new FormData(); fd.append('file',f);
-                            const r=await fetch(`${window.location.origin}/api/video-upload`,{method:'POST',body:fd});
+                            const r=await fetch(`${window.location.origin}/api/video-upload`,{method:'POST',headers:{'x-session-token':getST()},body:fd});
                             if(r.ok){const d=await r.json();url=d.url;}
                           }
                           if(url) setProHighlights(prev => prev.map(h => h.id===hlEditingId ? { ...h, mediaItems: [...h.mediaItems, {url, type:(isImg?'image':'video') as 'image'|'video'}] } : h));
