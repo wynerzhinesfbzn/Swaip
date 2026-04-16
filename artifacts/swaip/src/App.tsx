@@ -23960,10 +23960,11 @@ function MeetingsScreen({ onBack, userHash }: { onBack: () => void; userHash: st
   const [copied,         setCopied]         = useState<string | null>(null);
   const [openCard,       setOpenCard]       = useState<string | null>(null);
   const [lockedCard,     setLockedCard]     = useState<string | null>(null);
+  const [revealToken,    setRevealToken]    = useState<string | null>(null);
 
   const [fName,          setFName]          = useState('');
   const [fStartTime,     setFStartTime]     = useState('');
-  const [fTokenType,     setFTokenType]     = useState<'common' | 'individual'>('common');
+  const [fTokenType,     setFTokenType]     = useState<'open' | 'common' | 'individual'>('open');
   const [fCodeWord,      setFCodeWord]      = useState('');
   const [fTokenExpiry,   setFTokenExpiry]   = useState<'none' | '1h' | '1d'>('none');
   const [fAllowAnon,     setFAllowAnon]     = useState(false);
@@ -24003,7 +24004,7 @@ function MeetingsScreen({ onBack, userHash }: { onBack: () => void; userHash: st
       if (!r.ok) { alert(d.error || 'Ошибка создания'); return; }
       setResult(d);
       setShowCreate(false);
-      setFName(''); setFStartTime(''); setFTokenType('common'); setFCodeWord(''); setFTokenExpiry('none'); setFAllowAnon(false); setFAnonGuest(false);
+      setFName(''); setFStartTime(''); setFTokenType('open'); setFCodeWord(''); setFTokenExpiry('none'); setFAllowAnon(false); setFAnonGuest(false);
       await loadMeetings();
     } finally { setCreating(false); }
   };
@@ -24129,12 +24130,12 @@ function MeetingsScreen({ onBack, userHash }: { onBack: () => void; userHash: st
             <div style={{ fontSize:64, marginBottom:16 }}>🚪</div>
             <div style={{ fontSize:18, fontWeight:800, color:'#fff', marginBottom:8 }}>Пока пусто</div>
             <div style={{ fontSize:14, color:'rgba(255,255,255,0.35)', lineHeight:1.6, maxWidth:260, margin:'0 auto 24px' }}>
-              Создайте переговорную — пригласите участников по ссылке или токену
+              Создайте конференцию — выберите тип доступа и пригласите участников
             </div>
             <motion.button whileTap={{ scale:0.93 }} onClick={() => setShowCreate(true)}
               style={{ background:`linear-gradient(135deg,${ACCENT},#818cf8)`, border:'none', borderRadius:14,
                 padding:'12px 24px', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>
-              + Создать переговорную
+              + Создать конференцию
             </motion.button>
           </div>
         ) : filteredMeetings.length === 0 ? (
@@ -24238,59 +24239,95 @@ function MeetingsScreen({ onBack, userHash }: { onBack: () => void; userHash: st
                       </AnimatePresence>
                     </div>
 
-                    {/* ══ НИЖНЯЯ ПАНЕЛЬ: токены + действия ══ */}
+                    {/* ══ НИЖНЯЯ ПАНЕЛЬ: тип доступа + действия ══ */}
                     <div style={{ borderTop:`1px solid ${pal.frame}50`, padding:'10px 18px 14px',
-                      display:'flex', alignItems:'center', gap:8 }}>
-                      <div style={{ flex:1, display:'flex', gap:5, flexWrap:'wrap', overflow:'hidden', minWidth:0 }}>
-                        {m.commonToken && (
-                          <span style={{ fontSize:10, color:pal.accent, background:'rgba(0,0,0,0.35)',
-                            borderRadius:6, padding:'3px 8px', border:`1px solid ${pal.frame}`,
-                            fontWeight:800, letterSpacing:'0.06em', fontFamily:'monospace' }}>
-                            🔑 {m.commonToken}
+                      display:'flex', flexDirection:'column', gap:8 }}>
+
+                      {/* Строка: бейдж типа + кнопки */}
+                      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                        <div style={{ flex:1, display:'flex', gap:5, alignItems:'center', minWidth:0 }}>
+                          <span style={{ fontSize:10, color:'rgba(255,255,255,0.35)',
+                            borderRadius:6, padding:'3px 9px', border:'1px solid rgba(255,255,255,0.08)',
+                            background:'rgba(255,255,255,0.04)', fontWeight:700, letterSpacing:'0.04em' }}>
+                            {m.tokenType === 'open' ? '🚪 Открытый' : m.tokenType === 'common' ? '🔑 Общий токен' : '👤 Индивидуальный'}
                           </span>
-                        )}
-                        {m.allowAnonymous && (
-                          <span style={{ fontSize:10, color:'rgba(156,163,175,0.7)',
-                            borderRadius:6, padding:'3px 8px', border:'1px solid rgba(255,255,255,0.08)',
-                            background:'rgba(255,255,255,0.04)' }}>
-                            👻 Аноним
-                          </span>
-                        )}
-                        {m.anonymousToken && (
-                          <span style={{ fontSize:10, color:'rgba(165,180,252,0.8)',
-                            borderRadius:6, padding:'3px 8px', border:'1px solid rgba(99,102,241,0.3)',
-                            background:'rgba(99,102,241,0.08)', fontWeight:700, fontFamily:'monospace' }}>
-                            🎭 {m.anonymousToken}
-                          </span>
-                        )}
+                          {m.allowAnonymous && (
+                            <span style={{ fontSize:10, color:'rgba(156,163,175,0.5)',
+                              borderRadius:6, padding:'3px 8px', border:'1px solid rgba(255,255,255,0.07)',
+                              background:'rgba(255,255,255,0.03)' }}>👻</span>
+                          )}
+                        </div>
+                        <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+                          {/* Кнопка показать/скрыть токен — только если есть что показывать */}
+                          {(m.commonToken || m.anonymousToken) && (
+                            <motion.button whileTap={{ scale:0.85 }}
+                              onClick={() => setRevealToken(revealToken === m.meetingId ? null : m.meetingId)}
+                              title={revealToken === m.meetingId ? 'Скрыть токен' : 'Показать токен'}
+                              style={{ width:36, height:36, borderRadius:10, cursor:'pointer',
+                                display:'flex', alignItems:'center', justifyContent:'center',
+                                background: revealToken===m.meetingId ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.06)',
+                                border:`1.5px solid ${revealToken===m.meetingId ? 'rgba(99,102,241,0.5)' : pal.frame}`,
+                                color: revealToken===m.meetingId ? '#a5b4fc' : 'rgba(255,255,255,0.4)', fontSize:15 }}>
+                              {revealToken===m.meetingId ? '🙈' : '👁'}
+                            </motion.button>
+                          )}
+                          <motion.button whileTap={{ scale:0.85 }} onClick={() => copyLink(link, m.meetingId)}
+                            title="Скопировать ссылку"
+                            style={{ width:36, height:36, borderRadius:10, cursor:'pointer',
+                              display:'flex', alignItems:'center', justifyContent:'center',
+                              background: isCopied ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.07)',
+                              border:`1.5px solid ${isCopied ? 'rgba(74,222,128,0.5)' : pal.frame}`,
+                              color: isCopied ? '#4ade80' : 'rgba(255,255,255,0.45)', fontSize:15, transition:'all 0.2s' }}>
+                            {isCopied ? '✓' : '📋'}
+                          </motion.button>
+                          <motion.button whileTap={{ scale:0.85 }} onClick={() => shareLink(link, m.name)}
+                            title="Поделиться"
+                            style={{ width:36, height:36, borderRadius:10, cursor:'pointer',
+                              display:'flex', alignItems:'center', justifyContent:'center',
+                              background:'rgba(255,255,255,0.07)', border:`1.5px solid ${pal.frame}`,
+                              color:'rgba(255,255,255,0.45)', fontSize:15 }}>
+                            ↗
+                          </motion.button>
+                          <motion.button whileTap={{ scale:0.85 }} onClick={() => handleDelete(m.meetingId)}
+                            title="Удалить"
+                            style={{ width:36, height:36, borderRadius:10, cursor:'pointer',
+                              display:'flex', alignItems:'center', justifyContent:'center',
+                              background:'rgba(239,68,68,0.07)', border:'1.5px solid rgba(239,68,68,0.2)',
+                              color:'rgba(248,113,113,0.6)', fontSize:15 }}>
+                            🗑️
+                          </motion.button>
+                        </div>
                       </div>
-                      <div style={{ display:'flex', gap:6, flexShrink:0 }}>
-                        <motion.button whileTap={{ scale:0.85 }} onClick={() => copyLink(link, m.meetingId)}
-                          title="Скопировать ссылку"
-                          style={{ width:36, height:36, borderRadius:10, cursor:'pointer',
-                            display:'flex', alignItems:'center', justifyContent:'center',
-                            background: isCopied ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.07)',
-                            border:`1.5px solid ${isCopied ? 'rgba(74,222,128,0.5)' : pal.frame}`,
-                            color: isCopied ? '#4ade80' : 'rgba(255,255,255,0.45)', fontSize:15, transition:'all 0.2s' }}>
-                          {isCopied ? '✓' : '📋'}
-                        </motion.button>
-                        <motion.button whileTap={{ scale:0.85 }} onClick={() => shareLink(link, m.name)}
-                          title="Поделиться"
-                          style={{ width:36, height:36, borderRadius:10, cursor:'pointer',
-                            display:'flex', alignItems:'center', justifyContent:'center',
-                            background:'rgba(255,255,255,0.07)', border:`1.5px solid ${pal.frame}`,
-                            color:'rgba(255,255,255,0.45)', fontSize:15 }}>
-                          ↗
-                        </motion.button>
-                        <motion.button whileTap={{ scale:0.85 }} onClick={() => handleDelete(m.meetingId)}
-                          title="Удалить"
-                          style={{ width:36, height:36, borderRadius:10, cursor:'pointer',
-                            display:'flex', alignItems:'center', justifyContent:'center',
-                            background:'rgba(239,68,68,0.07)', border:'1.5px solid rgba(239,68,68,0.2)',
-                            color:'rgba(248,113,113,0.6)', fontSize:15 }}>
-                          🗑️
-                        </motion.button>
-                      </div>
+
+                      {/* Раскрытые токены — только для создателя, только после нажатия 👁 */}
+                      <AnimatePresence>
+                        {revealToken === m.meetingId && (
+                          <motion.div key="tokens"
+                            initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }} exit={{ opacity:0, height:0 }}
+                            style={{ overflow:'hidden' }}>
+                            <div style={{ display:'flex', flexDirection:'column', gap:6, paddingTop:4 }}>
+                              {m.commonToken && (
+                                <div style={{ background:'rgba(0,0,0,0.35)', border:`1px solid ${pal.frame}`,
+                                  borderRadius:10, padding:'10px 12px' }}>
+                                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', fontWeight:700,
+                                    letterSpacing:'0.08em', textTransform:'uppercase', marginBottom:5 }}>🔑 Общий токен</div>
+                                  <div style={{ fontSize:20, fontWeight:900, color:pal.accent,
+                                    letterSpacing:'0.18em', fontFamily:'monospace' }}>{m.commonToken}</div>
+                                </div>
+                              )}
+                              {m.anonymousToken && (
+                                <div style={{ background:'rgba(99,102,241,0.07)', border:'1px solid rgba(99,102,241,0.25)',
+                                  borderRadius:10, padding:'10px 12px' }}>
+                                  <div style={{ fontSize:10, color:'rgba(165,180,252,0.6)', fontWeight:700,
+                                    letterSpacing:'0.08em', textTransform:'uppercase', marginBottom:5 }}>🎭 Анонимный гость</div>
+                                  <div style={{ fontSize:20, fontWeight:900, color:'#a5b4fc',
+                                    letterSpacing:'0.18em', fontFamily:'monospace' }}>{m.anonymousToken}</div>
+                                </div>
+                              )}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                   </motion.div>
               );
@@ -24340,28 +24377,33 @@ function MeetingsScreen({ onBack, userHash }: { onBack: () => void; userHash: st
                       boxSizing:'border-box', fontFamily:'inherit', colorScheme:'dark' }} />
                 </div>
 
-                {/* Тип токена */}
+                {/* Тип доступа */}
                 <div>
-                  <div style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.45)', marginBottom:10, letterSpacing:'0.06em', textTransform:'uppercase' }}>Тип токена</div>
-                  <div style={{ display:'flex', gap:8 }}>
-                    {(['common', 'individual'] as const).map(type => (
-                      <motion.button key={type} whileTap={{ scale:0.95 }} onClick={() => setFTokenType(type)}
-                        style={{ flex:1, padding:'11px 8px', borderRadius:12, border:`1.5px solid ${fTokenType===type ? ACCENT : 'rgba(255,255,255,0.12)'}`,
-                          background: fTokenType===type ? `${ACCENT}22` : 'rgba(255,255,255,0.04)',
-                          color: fTokenType===type ? '#a5b4fc' : 'rgba(255,255,255,0.5)',
-                          fontSize:12, fontWeight:800, cursor:'pointer', textAlign:'center' }}>
-                        {type === 'common' ? '🔑 Общий токен' : '👤 Индивидуальные'}
+                  <div style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.45)', marginBottom:10, letterSpacing:'0.06em', textTransform:'uppercase' }}>Тип доступа</div>
+                  <div style={{ display:'flex', gap:6, flexDirection:'column' }}>
+                    {([
+                      { t:'open',       icon:'🚪', label:'Общий вход',      desc:'Любой, кто видит кабинет, заходит без токена' },
+                      { t:'common',     icon:'🔑', label:'Общий токен',     desc:'Один код для всех — вы сами раздаёте его нужным людям' },
+                      { t:'individual', icon:'👤', label:'Индивидуальный',  desc:'Каждому участнику — свой персональный токен' },
+                    ] as const).map(({ t, icon, label, desc }) => (
+                      <motion.button key={t} whileTap={{ scale:0.98 }} onClick={() => setFTokenType(t)}
+                        style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:12,
+                          border:`1.5px solid ${fTokenType===t ? ACCENT : 'rgba(255,255,255,0.10)'}`,
+                          background: fTokenType===t ? `${ACCENT}18` : 'rgba(255,255,255,0.03)',
+                          cursor:'pointer', textAlign:'left' }}>
+                        <span style={{ fontSize:20, flexShrink:0 }}>{icon}</span>
+                        <div>
+                          <div style={{ fontSize:13, fontWeight:800, color: fTokenType===t ? '#a5b4fc' : 'rgba(255,255,255,0.6)' }}>{label}</div>
+                          <div style={{ fontSize:11, color:'rgba(255,255,255,0.28)', marginTop:1, lineHeight:1.4 }}>{desc}</div>
+                        </div>
+                        {fTokenType===t && <span style={{ marginLeft:'auto', color:ACCENT, fontSize:16, flexShrink:0 }}>✓</span>}
                       </motion.button>
                     ))}
                   </div>
-                  <div style={{ fontSize:11, color:'rgba(255,255,255,0.3)', marginTop:6, lineHeight:1.5 }}>
-                    {fTokenType === 'common'
-                      ? 'Один токен для всех участников — они вводят один и тот же код'
-                      : 'Каждый участник получит персональный токен'}
-                  </div>
                 </div>
 
-                {/* Кодовое слово */}
+                {/* Кодовое слово — только для токенного входа */}
+                {fTokenType !== 'open' && (
                 <div>
                   <div style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.45)', marginBottom:8, letterSpacing:'0.06em', textTransform:'uppercase' }}>Кодовое слово (необязательно)</div>
                   <input value={fCodeWord} onChange={e => setFCodeWord(e.target.value)}
@@ -24370,8 +24412,10 @@ function MeetingsScreen({ onBack, userHash }: { onBack: () => void; userHash: st
                       borderRadius:12, padding:'13px 14px', color:'#fff', fontSize:14, outline:'none',
                       boxSizing:'border-box', fontFamily:'inherit' }} />
                 </div>
+                )}
 
-                {/* Срок действия */}
+                {/* Срок действия — только для токенного входа */}
+                {fTokenType !== 'open' && (
                 <div>
                   <div style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.45)', marginBottom:8, letterSpacing:'0.06em', textTransform:'uppercase' }}>Срок действия токена</div>
                   <select value={fTokenExpiry} onChange={e => setFTokenExpiry(e.target.value as any)}
@@ -24383,6 +24427,7 @@ function MeetingsScreen({ onBack, userHash }: { onBack: () => void; userHash: st
                     <option value="1d">1 день</option>
                   </select>
                 </div>
+                )}
 
                 {/* Тайные гости */}
                 <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between',

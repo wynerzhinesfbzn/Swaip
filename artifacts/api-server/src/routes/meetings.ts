@@ -222,7 +222,9 @@ router.post("/meetings/validate", async (req, res) => {
 
   /* Проверка токена (пропускаем если это anonymousToken — уже проверен выше) */
   if (!isAnonByToken) {
-    if (m.tokenType === "common") {
+    if (m.tokenType === "open") {
+      /* Общий вход — токен не нужен, пропускаем всех */
+    } else if (m.tokenType === "common") {
       if (!token?.trim() || token.trim().toUpperCase() !== (m.commonToken || "").toUpperCase())
         return res.status(403).json({ error: "Неверный токен доступа" });
     } else if (m.tokenType === "individual") {

@@ -318,8 +318,16 @@ export default function MeetingJoin() {
             </>
           )}
 
-          {/* Токен */}
-          {urlToken ? (
+          {/* Токен — скрываем для открытых конференций */}
+          {info?.tokenType === 'open' ? (
+            <div style={{ background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.2)',
+              borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 18 }}>🚪</span>
+              <div style={{ fontSize: 13, color: 'rgba(134,239,172,0.8)', fontWeight: 700 }}>
+                Открытая конференция — токен не нужен
+              </div>
+            </div>
+          ) : urlToken ? (
             <div style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)',
               borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 16 }}>🔑</span>
