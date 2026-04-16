@@ -21499,11 +21499,82 @@ function FlowScreen({ onBack, userHash, isActive }: { onBack: () => void; userHa
     const [viewingGroupIdx, setViewingGroupIdx] = useState(0);
     const [viewingStoryIdx, setViewingStoryIdx] = useState(0);
     const [showStoryCreator, setShowStoryCreator] = useState(false);
-    const [storyMediaType, setStoryMediaType] = useState<'video'|'image'|'text'>('text');
+    const [storyMediaType, setStoryMediaType] = useState<'video'|'image'|'text'|'record'>('text');
     const [storyText, setStoryText] = useState('');
     const [storyBgIdx, setStoryBgIdx] = useState(0);
     const [storyUploading, setStoryUploading] = useState(false);
     const storyFileRef = React.useRef<HTMLInputElement>(null);
+
+    /* ── Камера для записи ── */
+    const camVideoRef    = React.useRef<HTMLVideoElement>(null);
+    const camPreviewRef  = React.useRef<HTMLVideoElement>(null);
+    const camStreamRef   = React.useRef<MediaStream|null>(null);
+    const camRecorderRef = React.useRef<MediaRecorder|null>(null);
+    const camChunksRef   = React.useRef<BlobPart[]>([]);
+    const [camFacing,    setCamFacing]    = useState<'user'|'environment'>('user');
+    const [camRecording, setCamRecording] = useState(false);
+    const [camBlob,      setCamBlob]      = useState<Blob|null>(null);
+    const [camPreviewUrl,setCamPreviewUrl]= useState<string|null>(null);
+    const [camSeconds,   setCamSeconds]   = useState(0);
+    const camTimerRef = React.useRef<ReturnType<typeof setInterval>|null>(null);
+
+    const startCamera = async (facing: 'user'|'environment' = camFacing) => {
+      try {
+        if (camStreamRef.current) { camStreamRef.current.getTracks().forEach(t => t.stop()); }
+        const stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode: facing }, audio:true });
+        camStreamRef.current = stream;
+        if (camVideoRef.current) { camVideoRef.current.srcObject = stream; }
+      } catch { /* no camera permission */ }
+    };
+    const stopCamera = () => {
+      if (camStreamRef.current) { camStreamRef.current.getTracks().forEach(t => t.stop()); camStreamRef.current = null; }
+      if (camTimerRef.current) { clearInterval(camTimerRef.current); camTimerRef.current = null; }
+      setCamRecording(false); setCamSeconds(0);
+    };
+    const flipCamera = () => {
+      const next = camFacing === 'user' ? 'environment' : 'user';
+      setCamFacing(next); startCamera(next);
+    };
+    const startRecording = () => {
+      if (!camStreamRef.current) return;
+      camChunksRef.current = [];
+      const mr = new MediaRecorder(camStreamRef.current, { mimeType: 'video/webm;codecs=vp8,opus' });
+      mr.ondataavailable = e => { if (e.data.size > 0) camChunksRef.current.push(e.data); };
+      mr.onstop = () => {
+        const blob = new Blob(camChunksRef.current, { type:'video/webm' });
+        setCamBlob(blob);
+        const url = URL.createObjectURL(blob);
+        setCamPreviewUrl(url);
+        stopCamera();
+      };
+      mr.start(200);
+      camRecorderRef.current = mr;
+      setCamRecording(true); setCamSeconds(0);
+      camTimerRef.current = setInterval(() => setCamSeconds(s => s+1), 1000);
+    };
+    const stopRecording = () => {
+      camRecorderRef.current?.stop();
+      if (camTimerRef.current) { clearInterval(camTimerRef.current); camTimerRef.current = null; }
+    };
+    const resetCamRecording = () => {
+      if (camPreviewUrl) URL.revokeObjectURL(camPreviewUrl);
+      setCamBlob(null); setCamPreviewUrl(null); setCamRecording(false); setCamSeconds(0);
+      startCamera();
+    };
+    const uploadCamRecording = async () => {
+      if (!camBlob) return;
+      const file = new File([camBlob], `story_${Date.now()}.webm`, { type:'video/webm' });
+      await submitStory('video', file);
+    };
+
+    useEffect(() => {
+      if (storyMediaType === 'record' && showStoryCreator) {
+        setCamBlob(null); setCamPreviewUrl(null); setCamSeconds(0);
+        startCamera();
+      } else {
+        stopCamera();
+      }
+    }, [storyMediaType, showStoryCreator]);
 
     const loadStories = async () => {
       try {
@@ -22037,7 +22108,7 @@ function FlowScreen({ onBack, userHash, isActive }: { onBack: () => void; userHa
             {/* Шапка создателя */}
             <div style={{ display:'flex', alignItems:'center', gap:12, padding:'56px 16px 16px',
               borderBottom:'1px solid rgba(255,255,255,0.08)' }}>
-              <motion.button whileTap={{ scale:0.9 }} onClick={() => setShowStoryCreator(false)}
+              <motion.button whileTap={{ scale:0.9 }} onClick={() => { stopCamera(); setShowStoryCreator(false); }}
                 style={{ width:36, height:36, borderRadius:'50%', background:'rgba(255,255,255,0.07)',
                   border:'none', color:'#fff', fontSize:18, cursor:'pointer',
                   display:'flex', alignItems:'center', justifyContent:'center' }}>←</motion.button>
@@ -22045,22 +22116,107 @@ function FlowScreen({ onBack, userHash, isActive }: { onBack: () => void; userHa
             </div>
 
             {/* Выбор типа */}
-            <div style={{ display:'flex', gap:10, padding:'16px 16px 0' }}>
-              {(['video','image','text'] as const).map(type => (
+            <div style={{ display:'flex', gap:8, padding:'16px 16px 0', flexWrap:'wrap' }}>
+              {(['record','video','image','text'] as const).map(type => (
                 <motion.button key={type} whileTap={{ scale:0.93 }}
                   onClick={() => setStoryMediaType(type)}
-                  style={{ flex:1, padding:'10px 0', borderRadius:14,
+                  style={{ flex:'1 1 calc(25% - 6px)', minWidth:68, padding:'10px 4px', borderRadius:14,
                     background: storyMediaType === type ? `${PURPLE}22` : 'rgba(255,255,255,0.04)',
                     border: storyMediaType === type ? `2px solid ${PURPLE}` : '1px solid rgba(255,255,255,0.1)',
                     color: storyMediaType === type ? PURPLE : 'rgba(255,255,255,0.6)',
-                    fontWeight:800, fontSize:12, cursor:'pointer', fontFamily:'"Montserrat",sans-serif' }}>
-                  {type === 'video' ? '🎬 Видео' : type === 'image' ? '🖼 Фото' : '✍️ Текст'}
+                    fontWeight:800, fontSize:11, cursor:'pointer', fontFamily:'"Montserrat",sans-serif' }}>
+                  {type === 'record' ? '📹 Камера' : type === 'video' ? '🎬 Видео' : type === 'image' ? '🖼 Фото' : '✍️ Текст'}
                 </motion.button>
               ))}
             </div>
 
             {/* Контент по типу */}
-            <div style={{ flex:1, padding:'20px 16px', display:'flex', flexDirection:'column', gap:14, overflowY:'auto' }}>
+            <div style={{ flex:1, padding: storyMediaType === 'record' ? 0 : '20px 16px', display:'flex', flexDirection:'column', gap:14, overflowY:'auto', position:'relative' }}>
+
+              {/* ── 📹 КАМЕРА ── */}
+              {storyMediaType === 'record' && (
+                <div style={{ flex:1, display:'flex', flexDirection:'column', background:'#000', position:'relative', overflow:'hidden' }}>
+                  {!camPreviewUrl ? (
+                    <>
+                      {/* Живой Preview */}
+                      <video ref={el => {
+                        (camVideoRef as any).current = el;
+                        if (el && camStreamRef.current) el.srcObject = camStreamRef.current;
+                      }} autoPlay muted playsInline
+                        style={{ width:'100%', height:'100%', objectFit:'cover', transform: camFacing==='user' ? 'scaleX(-1)' : 'none', flex:1 }} />
+
+                      {/* Таймер записи */}
+                      {camRecording && (
+                        <div style={{ position:'absolute', top:16, left:0, right:0, display:'flex', justifyContent:'center' }}>
+                          <div style={{ background:'rgba(220,38,38,0.85)', borderRadius:20, padding:'5px 16px',
+                            display:'flex', alignItems:'center', gap:8, backdropFilter:'blur(4px)' }}>
+                            <div style={{ width:8, height:8, borderRadius:'50%', background:'#fff' }} />
+                            <span style={{ color:'#fff', fontWeight:800, fontSize:14, fontFamily:'"Montserrat",sans-serif' }}>
+                              {String(Math.floor(camSeconds/60)).padStart(2,'0')}:{String(camSeconds%60).padStart(2,'0')}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Кнопки снизу */}
+                      <div style={{ position:'absolute', bottom:0, left:0, right:0,
+                        background:'linear-gradient(transparent,rgba(0,0,0,0.7))',
+                        padding:'20px 0 32px', display:'flex', alignItems:'center', justifyContent:'center', gap:32 }}>
+
+                        {/* Перевернуть камеру */}
+                        <motion.button whileTap={{ scale:0.85 }} onClick={flipCamera}
+                          style={{ width:48, height:48, borderRadius:'50%', background:'rgba(255,255,255,0.18)',
+                            border:'none', color:'#fff', fontSize:22, cursor:'pointer',
+                            display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)' }}>
+                          🔄
+                        </motion.button>
+
+                        {/* Кнопка Запись / Стоп */}
+                        <motion.button whileTap={{ scale:0.92 }}
+                          onClick={() => camRecording ? stopRecording() : startRecording()}
+                          style={{ width:72, height:72, borderRadius:'50%', border:'4px solid #fff',
+                            background: camRecording ? '#dc2626' : 'rgba(220,38,38,0.85)',
+                            cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',
+                            boxShadow: camRecording ? '0 0 24px rgba(220,38,38,0.7)' : 'none',
+                            transition:'all 0.2s' }}>
+                          {camRecording
+                            ? <div style={{ width:22, height:22, borderRadius:4, background:'#fff' }} />
+                            : <div style={{ width:0, height:0, borderLeft:'20px solid #fff', borderTop:'12px solid transparent', borderBottom:'12px solid transparent', marginLeft:4 }} />
+                          }
+                        </motion.button>
+
+                        {/* Заглушка для симметрии */}
+                        <div style={{ width:48, height:48 }} />
+                      </div>
+                    </>
+                  ) : (
+                    /* Просмотр записанного видео */
+                    <>
+                      <video ref={camPreviewRef} src={camPreviewUrl} controls playsInline
+                        style={{ width:'100%', flex:1, objectFit:'contain', background:'#000' }} />
+                      <div style={{ display:'flex', gap:12, padding:'12px 16px 24px' }}>
+                        <motion.button whileTap={{ scale:0.94 }} onClick={resetCamRecording}
+                          style={{ flex:1, padding:'13px 0', borderRadius:14,
+                            background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.15)',
+                            color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer',
+                            fontFamily:'"Montserrat",sans-serif' }}>
+                          ↺ Переснять
+                        </motion.button>
+                        <motion.button whileTap={{ scale:0.94 }} onClick={uploadCamRecording}
+                          disabled={storyUploading}
+                          style={{ flex:2, padding:'13px 0', borderRadius:14,
+                            background: PURPLE, border:'none',
+                            color:'#fff', fontSize:14, fontWeight:800, cursor: storyUploading ? 'not-allowed' : 'pointer',
+                            fontFamily:'"Montserrat",sans-serif',
+                            opacity: storyUploading ? 0.6 : 1 }}>
+                          {storyUploading ? '⏳ Загрузка...' : '🚀 Опубликовать'}
+                        </motion.button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
               {(storyMediaType === 'video' || storyMediaType === 'image') && (
                 <>
                   <input ref={storyFileRef} type="file" accept={storyMediaType === 'video' ? 'video/*' : 'image/*'}
